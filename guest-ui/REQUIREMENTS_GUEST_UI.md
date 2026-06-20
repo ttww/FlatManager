@@ -1,5 +1,8 @@
 # Guest UI Requirements
 
+## Cross-Module Reference
+- Project overview: [../REQUIREMENTS_PROJECT_OVERVIEW.md](../REQUIREMENTS_PROJECT_OVERVIEW.md)
+
 ## Scope
 This module provides the public, mobile-friendly page reached via QR code where guests enter their access code to open the door.
 
@@ -47,3 +50,28 @@ In these cases, provide a neutral message and clear next step (for example conta
 - Admin management workflows.
 - Firmware behavior.
 - Backend persistence design.
+
+## Implementation Checklist
+
+- [ ] Step 1: Define guest UI route structure and deployment path used by QR code.
+	Check later: opening the QR target always lands on the intended entry page.
+- [ ] Step 2: Define page layout and mobile-first interaction flow.
+	Check later: core form is fully usable on common phone viewport sizes.
+- [ ] Step 3: Implement secure form model with apartment identifier and numeric code input.
+	Check later: only valid numeric format is accepted before submit.
+- [ ] Step 4: Integrate submit flow to guest open API endpoint.
+	Check later: payload matches API contract and handles network failures.
+- [ ] Step 5: Implement loading, success, and denied states with neutral language.
+	Check later: denied responses never expose whether code is wrong, expired, or disabled.
+- [ ] Step 6: Implement rate-limit and repeated-failure messaging UX.
+	Check later: user receives clear next action without technical backend detail.
+- [ ] Step 7: Implement resilient behavior for slow responses and temporary offline conditions.
+	Check later: timeouts and retry guidance are visible and understandable.
+- [ ] Step 8: Apply accessibility checks for contrast, focus order, labels, and tap targets.
+	Check later: keyboard navigation and screen-reader labels are complete.
+- [ ] Step 9: Add localization-ready copy structure (English-first now).
+	Check later: all UI strings are centralized and easy to translate.
+- [ ] Step 10: Add tracking hooks for functional events without sensitive data leakage.
+	Check later: no raw code or token values appear in logs/analytics.
+- [ ] Step 11: Perform end-to-end guest journey validation against API staging.
+	Check later: scan, input, submit, and response flow passes on real devices.

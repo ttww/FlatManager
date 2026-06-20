@@ -1,5 +1,8 @@
 # API Requirements (FastAPI)
 
+## Cross-Module Reference
+- Project overview: [../REQUIREMENTS_PROJECT_OVERVIEW.md](../REQUIREMENTS_PROJECT_OVERVIEW.md)
+
 ## Scope
 This module provides all backend endpoints, business rules, command lifecycle management, storage, and security enforcement.
 
@@ -134,3 +137,32 @@ Device status can be derived from `last_seen`:
 - Frontend implementation details.
 - Firmware pin-level implementation details.
 - NGINX is already setup an us used in a later stage
+
+## Implementation Checklist
+
+- [ ] Step 1: Define API module structure and configuration boundaries.
+	Check later: startup works, environment variables are validated, and config loading is documented.
+- [ ] Step 2: Define database schema and migrations for access codes, devices, commands, and logs.
+	Check later: all required tables/fields exist and constraints match this document.
+- [ ] Step 3: Implement secure hashing and verification for guest access codes and device tokens.
+	Check later: no plaintext secrets are persisted and verification passes unit tests.
+- [ ] Step 4: Implement device authentication middleware for bearer token endpoints.
+	Check later: unauthorized requests are rejected and authorized requests succeed.
+- [ ] Step 5: Implement guest open endpoint with full validation and neutral responses.
+	Check later: valid request is accepted, invalid cases are denied without leaking reason details.
+- [ ] Step 6: Implement command creation lifecycle with short expiration and status transitions.
+	Check later: expired commands cannot be delivered or executed.
+- [ ] Step 7: Implement long-poll endpoint behavior with timeout handling and last_seen updates.
+	Check later: no-command path returns command none, command path returns immediately.
+- [ ] Step 8: Implement command-result endpoint with lifecycle updates and logging.
+	Check later: done, failed, expired, ignored statuses are persisted correctly.
+- [ ] Step 9: Implement rate limits and temporary lockout rules.
+	Check later: abuse scenarios are throttled and logged.
+- [ ] Step 10: Implement audit logging for all guest attempts and command outcomes.
+	Check later: success and denied events are queryable with timestamps and context fields.
+- [ ] Step 11: Implement admin-facing status/query endpoints required by admin UI.
+	Check later: device status and command history can be retrieved reliably.
+- [ ] Step 12: Add tests for validation logic, command lifecycle, auth, and rate limits.
+	Check later: required test suite passes and covers critical security paths.
+- [ ] Step 13: Prepare deployment notes for NGINX long-poll behavior and HTTPS assumptions.
+	Check later: documented proxy settings match runtime expectations.

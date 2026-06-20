@@ -1,5 +1,8 @@
 # ESP8266 Firmware Requirements (ESP-01S, PlatformIO)
 
+## Cross-Module Reference
+- Project overview: [../REQUIREMENTS_PROJECT_OVERVIEW.md](../REQUIREMENTS_PROJECT_OVERVIEW.md)
+
 ## Scope
 This module implements the device-side logic for secure long polling, command execution, relay control, and resilient reconnect behavior.
 
@@ -67,3 +70,30 @@ This module implements the device-side logic for secure long polling, command ex
 ## Out of Scope for This Module File
 - Backend validation/rate-limit business rules.
 - Guest/admin UI behavior.
+
+## Implementation Checklist
+
+- [ ] Step 1: Define firmware project structure, build settings, and environment constants.
+	Check later: firmware builds reproducibly for ESP-01S target.
+- [ ] Step 2: Implement safe GPIO and relay initialization with OFF default on boot.
+	Check later: power-on and reboot never trigger unintended relay activation.
+- [ ] Step 3: Implement Wi-Fi connection manager with reconnect handling.
+	Check later: device recovers from Wi-Fi drops without manual intervention.
+- [ ] Step 4: Implement HTTPS client setup and certificate validation strategy.
+	Check later: only trusted TLS connections to backend are accepted.
+- [ ] Step 5: Implement device authentication header flow for long-poll and result endpoints.
+	Check later: missing or invalid token requests fail predictably.
+- [ ] Step 6: Implement long-poll request loop and timeout reconnect behavior.
+	Check later: timeout path reconnects immediately with optional jitter.
+- [ ] Step 7: Implement open-command parsing and expiration validation.
+	Check later: expired commands are rejected and reported as expired or ignored.
+- [ ] Step 8: Implement relay pulse execution with strict local max duration clamp.
+	Check later: any duration above max is capped and logged in result message.
+- [ ] Step 9: Implement command-result reporting for done, failed, expired, and ignored states.
+	Check later: each state is emitted with command_id and diagnostic message.
+- [ ] Step 10: Implement exponential backoff sequence for network/TLS failure cases.
+	Check later: retry timing follows 1s, 2s, 5s, 10s, 30s and then remains capped.
+- [ ] Step 11: Implement watchdog and recovery behavior for stalled loops.
+	Check later: simulated hangs trigger recovery without unsafe relay state changes.
+- [ ] Step 12: Add hardware-in-the-loop verification plan for relay safety and command latency.
+	Check later: measured pulse duration and response latency stay within requirements.
