@@ -1,0 +1,9 @@
+{
+    "cSpell.words": [
+        "flatmanager"
+    ],
+    "python.defaultInterpreterPath": "${workspaceFolder}/api/.venv/bin/python",
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/api/src"
+    ]
+}
