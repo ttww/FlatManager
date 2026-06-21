@@ -33,7 +33,7 @@
 #endif
 
 #ifndef FM_RELAY_PIN
-#define FM_RELAY_PIN 2
+#define FM_RELAY_PIN 0
 #endif
 
 #ifndef FM_RELAY_ACTIVE_HIGH

@@ -1,3 +1,6 @@
 Scratch.md
 /esp8266/.pio
 api/data/flatmanager.db
+api/.env
+esp8266/include/secrets.h
+api/.env
