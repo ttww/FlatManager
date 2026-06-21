@@ -10,6 +10,9 @@ from .settings import settings
 app = FastAPI(
     title=settings.app_name,
     debug=settings.app_debug,
+    docs_url=settings.docs_url,
+    redoc_url=settings.redoc_url,
+    openapi_url=settings.openapi_url,
 )
 
 app.add_middleware(

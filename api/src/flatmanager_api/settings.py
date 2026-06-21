@@ -14,6 +14,9 @@ class Settings(BaseSettings):
 
     host: str = Field(default="127.0.0.1")
     port: int = Field(default=8000)
+    docs_url: str = Field(default="/api/docs")
+    redoc_url: str = Field(default="/api/redoc")
+    openapi_url: str = Field(default="/api/openapi.json")
 
     database_url: str = Field(default=f"sqlite:///{DEFAULT_DB_PATH}")
 
