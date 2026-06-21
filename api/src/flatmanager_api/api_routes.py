@@ -593,9 +593,7 @@ def admin_manual_open(
     session: Annotated[Session, Depends(get_session)],
 ) -> AdminManualOpenResponse:
     device = session.exec(
-        select(Device)
-        .where(Device.apartment_id == payload.apartment_id)
-        .order_by(Device.id.asc())
+        select(Device).where(Device.apartment_id == payload.apartment_id).order_by(Device.id.asc())
     ).first()
     if device is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")

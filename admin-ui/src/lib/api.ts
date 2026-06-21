@@ -1,6 +1,6 @@
 import type {
     AccessCodeForm,
-  AccessCodeSummary,
+    AccessCodeSummary,
     AccessLogSummary,
     AdminDevice,
     CommandSummary,
