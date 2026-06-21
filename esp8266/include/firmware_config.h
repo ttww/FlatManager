@@ -2,24 +2,26 @@
 
 #include <stdint.h>
 
+#include "secrets.h"
+
 #ifndef FM_DEVICE_NAME
-#define FM_DEVICE_NAME "esp8266-device"
+#error "FM_DEVICE_NAME is not defined. Define it in secret.h"
 #endif
 
 #ifndef FM_WIFI_SSID
-#define FM_WIFI_SSID ""
+#error "FM_WIFI_SSID is not defined. Define it in secret.h"
 #endif
 
 #ifndef FM_WIFI_PASSWORD
-#define FM_WIFI_PASSWORD ""
+#error "FM_WIFI_PASSWORD is not defined. Define it in secret.h"
 #endif
 
 #ifndef FM_API_BASE_URL
-#define FM_API_BASE_URL ""
+#error "FM_API_BASE_URL is not defined. Define it in secret.h"
 #endif
 
 #ifndef FM_DEVICE_TOKEN
-#define FM_DEVICE_TOKEN ""
+#error "FM_DEVICE_TOKEN is not defined. Define it in secret.h"
 #endif
 
 #ifndef FM_WAIT_COMMAND_PATH
@@ -67,11 +69,11 @@
 #endif
 
 #ifndef FM_OTA_HOSTNAME
-#define FM_OTA_HOSTNAME "flatmanager-esp"
+#error "FM_OTA_HOSTNAME is not defined. Define it in secret.h"
 #endif
 
 #ifndef FM_OTA_PASSWORD
-#define FM_OTA_PASSWORD ""
+#error "FM_OTA_PASSWORD is not defined. Define it in secret.h"
 #endif
 
 #ifndef FM_NTP_SERVER_1

@@ -12,9 +12,14 @@ from .db import get_session
 from .models import AccessCode, AccessLog, Device, DoorCommand
 from .schemas import (
     AccessLogSummaryResponse,
+    AdminAccessCodeCreateRequest,
+    AdminAccessCodeSummaryResponse,
+    AdminAccessCodeUpdateRequest,
     AdminDeviceCreateRequest,
     AdminDeviceCreateResponse,
     AdminDeviceSummaryResponse,
+    AdminManualOpenRequest,
+    AdminManualOpenResponse,
     AdminRotateTokenResponse,
     CommandResultRequest,
     CommandResultResponse,
@@ -575,3 +580,165 @@ def admin_recent_access_logs(
     return [
         AccessLogSummaryResponse.model_validate(log_row) for log_row in session.exec(query).all()
     ]
+
+
+@router.post(
+    "/admin/commands/manual-open",
+    response_model=AdminManualOpenResponse,
+    dependencies=[Depends(require_admin_token)],
+)
+def admin_manual_open(
+    payload: AdminManualOpenRequest,
+    request: Request,
+    session: Annotated[Session, Depends(get_session)],
+) -> AdminManualOpenResponse:
+    device = session.exec(
+        select(Device)
+        .where(Device.apartment_id == payload.apartment_id)
+        .order_by(Device.id.asc())
+    ).first()
+    if device is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+
+    duration_ms = payload.duration_ms or settings.default_open_duration_ms
+    command = DoorCommand(
+        device_id=device.id,
+        apartment_id=payload.apartment_id,
+        command="open",
+        duration_ms=duration_ms,
+        status="pending",
+        source="admin_manual",
+        access_code_id=None,
+    )
+    session.add(command)
+    session.flush()
+
+    ip_address = request.client.host if request.client else "unknown"
+    log_access_event(
+        session,
+        apartment_id=payload.apartment_id,
+        ip_address=ip_address,
+        result="success",
+        reason="manual_open_requested",
+        command_id=command.id,
+        access_code_id=None,
+        user_agent=request.headers.get("user-agent"),
+    )
+
+    session.commit()
+    return AdminManualOpenResponse(
+        status="accepted",
+        message="Manual open command submitted.",
+        command_id=command.id,
+        apartment_id=payload.apartment_id,
+        device_id=device.id,
+    )
+
+
+@router.get(
+    "/admin/access-codes",
+    response_model=list[AdminAccessCodeSummaryResponse],
+    dependencies=[Depends(require_admin_token)],
+)
+def admin_list_access_codes(
+    session: Annotated[Session, Depends(get_session)],
+    apartment_id: str | None = None,
+) -> list[AdminAccessCodeSummaryResponse]:
+    query = select(AccessCode).order_by(AccessCode.valid_until.desc())
+    if apartment_id:
+        query = query.where(AccessCode.apartment_id == apartment_id)
+    return [AdminAccessCodeSummaryResponse.model_validate(row) for row in session.exec(query).all()]
+
+
+@router.post(
+    "/admin/access-codes",
+    response_model=AdminAccessCodeSummaryResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_admin_token)],
+)
+def admin_create_access_code(
+    payload: AdminAccessCodeCreateRequest,
+    session: Annotated[Session, Depends(get_session)],
+) -> AdminAccessCodeSummaryResponse:
+    now = utc_now()
+    code_hash = hash_access_code(payload.apartment_id, payload.code)
+    access_code = AccessCode(
+        apartment_id=payload.apartment_id,
+        code_hash=code_hash,
+        valid_from=payload.valid_from,
+        valid_until=payload.valid_until,
+        max_uses=payload.max_uses,
+        booking_reference=payload.booking_reference,
+        guest_name=payload.guest_name,
+        active=True,
+        used_count=0,
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(access_code)
+    session.commit()
+    session.refresh(access_code)
+    return AdminAccessCodeSummaryResponse.model_validate(access_code)
+
+
+@router.patch(
+    "/admin/access-codes/{code_id}",
+    response_model=AdminAccessCodeSummaryResponse,
+    dependencies=[Depends(require_admin_token)],
+)
+def admin_update_access_code(
+    code_id: int,
+    payload: AdminAccessCodeUpdateRequest,
+    session: Annotated[Session, Depends(get_session)],
+) -> AdminAccessCodeSummaryResponse:
+    access_code = session.get(AccessCode, code_id)
+    if access_code is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Access code not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(access_code, field, value)
+    access_code.updated_at = utc_now()
+
+    session.add(access_code)
+    session.commit()
+    session.refresh(access_code)
+    return AdminAccessCodeSummaryResponse.model_validate(access_code)
+
+
+@router.post(
+    "/admin/access-codes/{code_id}/deactivate",
+    response_model=AdminAccessCodeSummaryResponse,
+    dependencies=[Depends(require_admin_token)],
+)
+def admin_deactivate_access_code(
+    code_id: int,
+    session: Annotated[Session, Depends(get_session)],
+) -> AdminAccessCodeSummaryResponse:
+    access_code = session.get(AccessCode, code_id)
+    if access_code is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Access code not found")
+
+    access_code.active = False
+    access_code.updated_at = utc_now()
+    session.add(access_code)
+    session.commit()
+    session.refresh(access_code)
+    return AdminAccessCodeSummaryResponse.model_validate(access_code)
+
+
+@router.delete(
+    "/admin/access-codes/{code_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin_token)],
+)
+def admin_delete_access_code(
+    code_id: int,
+    session: Annotated[Session, Depends(get_session)],
+) -> None:
+    access_code = session.get(AccessCode, code_id)
+    if access_code is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Access code not found")
+
+    session.delete(access_code)
+    session.commit()

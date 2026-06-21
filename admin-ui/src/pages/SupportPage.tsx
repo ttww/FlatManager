@@ -17,9 +17,7 @@ export function SupportPage() {
       setMessage("Manual open command submitted.");
       setApartmentId("");
     } catch (error) {
-      setMessage(
-        `Manual open endpoint is not available yet. ${error instanceof Error ? error.message : ""}`,
-      );
+      setMessage(`Manual open failed. ${error instanceof Error ? error.message : ""}`);
     }
   };
 

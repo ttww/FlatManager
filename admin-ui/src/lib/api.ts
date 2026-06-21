@@ -1,5 +1,6 @@
 import type {
     AccessCodeForm,
+  AccessCodeSummary,
     AccessLogSummary,
     AdminDevice,
     CommandSummary,
@@ -78,14 +79,19 @@ export const api = {
   },
 
   createAccessCode(adminToken: string, payload: AccessCodeForm) {
-    return request<unknown>("/api/admin/access-codes", adminToken, {
+    return request<AccessCodeSummary>("/api/admin/access-codes", adminToken, {
       method: "POST",
       body: JSON.stringify(payload),
     });
   },
 
+  listAccessCodes(adminToken: string, apartmentId?: string) {
+    const query = apartmentId ? `?apartment_id=${encodeURIComponent(apartmentId)}` : "";
+    return request<AccessCodeSummary[]>(`/api/admin/access-codes${query}`, adminToken);
+  },
+
   updateAccessCode(adminToken: string, codeId: number, payload: Partial<AccessCodeForm>) {
-    return request<unknown>(`/api/admin/access-codes/${codeId}`, adminToken, {
+    return request<AccessCodeSummary>(`/api/admin/access-codes/${codeId}`, adminToken, {
       method: "PATCH",
       body: JSON.stringify(payload),
     });
@@ -98,7 +104,7 @@ export const api = {
   },
 
   deactivateAccessCode(adminToken: string, codeId: number) {
-    return request<unknown>(`/api/admin/access-codes/${codeId}/deactivate`, adminToken, {
+    return request<AccessCodeSummary>(`/api/admin/access-codes/${codeId}/deactivate`, adminToken, {
       method: "POST",
     });
   },

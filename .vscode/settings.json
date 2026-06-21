@@ -6,6 +6,5 @@
     "C_Cpp.default.configurationProvider": "platformio.platformio-ide",
     "python.defaultInterpreterPath": "${workspaceFolder}/api/.venv/bin/python",
     "python.analysis.extraPaths": [
-        "${workspaceFolder}/api/src"
-    ]
+        "${workspaceFolder}/api/src"    ]
 }
