@@ -1,0 +1,43 @@
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    image: ${IMAGE_REPO:-flatmanager}/api:${TAG:-latest}
+    env_file:
+      - ./api/.env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8000
+      DATABASE_URL: sqlite:///./data/flatmanager.db
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api/data:/app/data
+    restart: unless-stopped
+
+  admin-ui:
+    build:
+      context: ./admin-ui
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+    image: ${IMAGE_REPO:-flatmanager}/admin-ui:${TAG:-latest}
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  guest-ui:
+    build:
+      context: ./guest-ui
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+    image: ${IMAGE_REPO:-flatmanager}/guest-ui:${TAG:-latest}
+    ports:
+      - "8081:80"
+    depends_on:
+      - api
+    restart: unless-stopped
