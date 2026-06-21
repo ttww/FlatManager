@@ -1,5 +1,6 @@
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 
+import "./admin.css";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Sidebar } from "./components/Sidebar";
 import { CodesPage } from "./pages/CodesPage";
@@ -8,7 +9,6 @@ import { DevicesPage } from "./pages/DevicesPage";
 import { LoginPage } from "./pages/LoginPage";
 import { LogsPage } from "./pages/LogsPage";
 import { SupportPage } from "./pages/SupportPage";
-import "./admin.css";
 
 function AdminLayout() {
   return (
