@@ -1,19 +1,21 @@
 export type Locale =
-  | "en"
-  | "de"
-  | "cs"
-  | "uk"
-  | "ru"
-  | "ja"
-  | "zh"
-  | "ko"
   | "ar"
-  | "fr"
+  | "cs"
+  | "de"
+  | "el"
+  | "en"
+  | "eo"
   | "es"
-  | "pt"
-  | "pl"
+  | "fr"
+  | "hi"
   | "hu"
-  | "eo";
+  | "ja"
+  | "ko"
+  | "pl"
+  | "pt"
+  | "ru"
+  | "uk"
+  | "zh";
 
 export type Dictionary = {
   appTitle: string;
@@ -353,22 +355,86 @@ export const messages: Record<Locale, Dictionary> = {
     requiredApartment: "La kampo de apartemento estas deviga.",
     invalidCode: "Bonvolu enigi 4-8 ciferan numeran kodon.",
   },
+  hi: {
+    appTitle: "प्रवेश द्वार खोलें",
+    subtitle: "दरवाज़ा खोलने का अनुरोध भेजने के लिए अतिथि कोड दर्ज करें।",
+    apartmentLabel: "अपार्टमेंट",
+    apartmentPlaceholder: "उदा. apartment-01",
+    codeLabel: "एक्सेस कोड",
+    codePlaceholder: "6 अंकों का कोड",
+    submit: "दरवाज़ा खोलें",
+    submitting: "भेजा जा रहा है...",
+    neutralDenied: "कोड अमान्य है या अब मान्य नहीं है।",
+    accepted: "दरवाज़ा खोलने का अनुरोध भेज दिया गया है। कृपया थोड़ा प्रतीक्षा करें।",
+    networkError: "नेटवर्क समस्या। कृपया फिर से प्रयास करें।",
+    timeoutError: "अनुरोध में बहुत समय लगा। कृपया फिर से प्रयास करें।",
+    rateLimited: "फिर से प्रयास करने से पहले कृपया थोड़ा इंतजार करें।",
+    offlineHint: "लगता है आप ऑफलाइन हैं।",
+    retryHint: "यदि समस्या बनी रहती है, तो अपने होस्ट से संपर्क करें।",
+    language: "भाषा",
+    contactHost: "सहायता के लिए अपने होस्ट से संपर्क करें।",
+    requiredApartment: "अपार्टमेंट आवश्यक है।",
+    invalidCode: "कृपया 4 से 8 अंकों का संख्यात्मक कोड दर्ज करें।",
+  },
+  el: {
+    appTitle: "Ανοιγμα πορτας εισοδου",
+    subtitle: "Εισαγαγετε τον κωδικο επισκεπτη για να στειλετε αιτημα ανοιγματος πορτας.",
+    apartmentLabel: "Διαμερισμα",
+    apartmentPlaceholder: "π.χ. apartment-01",
+    codeLabel: "Κωδικος προσβασης",
+    codePlaceholder: "6ψηφιος κωδικος",
+    submit: "Ανοιγμα πορτας",
+    submitting: "Αποστολη...",
+    neutralDenied: "Ο κωδικος ειναι μη εγκυρος ή δεν ισχυει πλεον.",
+    accepted: "Το αιτημα ανοιγματος πορτας σταλθηκε. Παρακαλω περιμενετε λιγο.",
+    networkError: "Προβλημα δικτυου. Δοκιμαστε ξανα.",
+    timeoutError: "Το αιτημα αργησε πολυ. Δοκιμαστε ξανα.",
+    rateLimited: "Παρακαλω περιμενετε λιγο πριν προσπαθησετε ξανα.",
+    offlineHint: "Φαινεται οτι ειστε εκτος συνδεσης.",
+    retryHint: "Αν αυτο συνεχιστει, επικοινωνηστε με τον οικοδεσποτη σας.",
+    language: "Γλωσσα",
+    contactHost: "Παρακαλω επικοινωνηστε με τον οικοδεσποτη για βοηθεια.",
+    requiredApartment: "Το διαμερισμα ειναι υποχρεωτικο.",
+    invalidCode: "Παρακαλω εισαγαγετε αριθμητικο κωδικο 4 εως 8 ψηφιων.",
+  },
+};
+
+export const localeMeta: Record<Locale, { lang: string; dir: "ltr" | "rtl" }> = {
+  ar: { lang: "ar", dir: "rtl" },
+  cs: { lang: "cs", dir: "ltr" },
+  de: { lang: "de", dir: "ltr" },
+  el: { lang: "el", dir: "ltr" },
+  en: { lang: "en", dir: "ltr" },
+  eo: { lang: "eo", dir: "ltr" },
+  es: { lang: "es", dir: "ltr" },
+  fr: { lang: "fr", dir: "ltr" },
+  hi: { lang: "hi", dir: "ltr" },
+  hu: { lang: "hu", dir: "ltr" },
+  ja: { lang: "ja", dir: "ltr" },
+  ko: { lang: "ko", dir: "ltr" },
+  pl: { lang: "pl", dir: "ltr" },
+  pt: { lang: "pt", dir: "ltr" },
+  ru: { lang: "ru", dir: "ltr" },
+  uk: { lang: "uk", dir: "ltr" },
+  zh: { lang: "zh", dir: "ltr" },
 };
 
 export const localeOptions: Array<{ value: Locale; label: string }> = [
-  { value: "en", label: "🇬🇧 English" },
-  { value: "de", label: "🇩🇪 Deutsch" },
-  { value: "cs", label: "🇨🇿 Czech" },
-  { value: "uk", label: "🇺🇦 Ukrainian" },
-  { value: "ru", label: "🇷🇺 Russian" },
-  { value: "ja", label: "🇯🇵 Japanese" },
-  { value: "zh", label: "🇨🇳 Chinese" },
-  { value: "ko", label: "🇰🇷 Korean" },
   { value: "ar", label: "🇸🇦 Arabic" },
-  { value: "fr", label: "🇫🇷 French" },
-  { value: "es", label: "🇪🇸 Spanish" },
-  { value: "pt", label: "🇵🇹 Portuguese" },
-  { value: "pl", label: "🇵🇱 Polish" },
-  { value: "hu", label: "🇭🇺 Hungarian" },
+  { value: "cs", label: "🇨🇿 Czech" },
+  { value: "de", label: "🇩🇪 Deutsch" },
+  { value: "el", label: "🇬🇷 Greek" },
+  { value: "en", label: "🇬🇧 English" },
   { value: "eo", label: "⭐ Esperanto" },
+  { value: "es", label: "🇪🇸 Spanish" },
+  { value: "fr", label: "🇫🇷 French" },
+  { value: "hi", label: "🇮🇳 Hindi" },
+  { value: "hu", label: "🇭🇺 Hungarian" },
+  { value: "ja", label: "🇯🇵 Japanese" },
+  { value: "ko", label: "🇰🇷 Korean" },
+  { value: "pl", label: "🇵🇱 Polish" },
+  { value: "pt", label: "🇵🇹 Portuguese" },
+  { value: "ru", label: "🇷🇺 Russian" },
+  { value: "uk", label: "🇺🇦 Ukrainian" },
+  { value: "zh", label: "🇨🇳 Chinese" },
 ];

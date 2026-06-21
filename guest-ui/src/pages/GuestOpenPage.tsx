@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { localeOptions, messages, type Locale } from "../i18n/messages";
+import { localeMeta, localeOptions, messages, type Locale } from "../i18n/messages";
 import { GuestApiError, requestDoorOpen } from "../lib/api";
 import { trackEvent } from "../lib/tracking";
 
@@ -9,7 +9,23 @@ type UiState = "idle" | "loading" | "accepted" | "denied" | "network-error" | "t
 
 function detectInitialLocale(): Locale {
   const browserLocale = navigator.language.toLowerCase();
-  return browserLocale.startsWith("de") ? "de" : "en";
+  if (browserLocale.startsWith("de")) return "de";
+  if (browserLocale.startsWith("cs")) return "cs";
+  if (browserLocale.startsWith("uk")) return "uk";
+  if (browserLocale.startsWith("ru")) return "ru";
+  if (browserLocale.startsWith("ja")) return "ja";
+  if (browserLocale.startsWith("zh")) return "zh";
+  if (browserLocale.startsWith("ko")) return "ko";
+  if (browserLocale.startsWith("ar")) return "ar";
+  if (browserLocale.startsWith("fr")) return "fr";
+  if (browserLocale.startsWith("es")) return "es";
+  if (browserLocale.startsWith("pt")) return "pt";
+  if (browserLocale.startsWith("pl")) return "pl";
+  if (browserLocale.startsWith("hu")) return "hu";
+  if (browserLocale.startsWith("eo")) return "eo";
+  if (browserLocale.startsWith("hi")) return "hi";
+  if (browserLocale.startsWith("el")) return "el";
+  return "en";
 }
 
 export function GuestOpenPage() {
@@ -21,6 +37,7 @@ export function GuestOpenPage() {
   const [errorText, setErrorText] = useState("");
 
   const t = messages[locale];
+  const currentLocaleMeta = localeMeta[locale];
   const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
 
   const stateMessage = useMemo(() => {
@@ -102,7 +119,7 @@ export function GuestOpenPage() {
   };
 
   return (
-    <main className="guest-shell">
+    <main className="guest-shell" dir={currentLocaleMeta.dir} lang={currentLocaleMeta.lang}>
       <section className="guest-card" aria-live="polite">
         <div className="top-row">
           <div>

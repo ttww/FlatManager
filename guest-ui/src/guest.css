@@ -12,6 +12,7 @@
   border-radius: 22px;
   box-shadow: 0 20px 50px rgba(27, 42, 68, 0.14);
   padding: 22px;
+  text-align: start;
 }
 
 .top-row {
@@ -37,6 +38,15 @@ h1 {
   gap: 6px;
   font-size: 0.82rem;
   color: var(--muted);
+}
+
+[dir="rtl"] .top-row {
+  direction: rtl;
+}
+
+[dir="rtl"] .language-picker select,
+[dir="rtl"] .guest-form input {
+  text-align: right;
 }
 
 .language-picker select {
