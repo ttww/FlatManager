@@ -39,6 +39,7 @@ This module provides the public, mobile-friendly page reached via QR code where 
 - Can include tasteful background image styling.
 - Accessibility-conscious typography and contrast.
 - Fast interaction with clear button/input affordance.
+- Support i18n, selecten based on browser language and via a pulldown menu with flag+text
 
 ## Content Guidance
 

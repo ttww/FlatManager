@@ -63,9 +63,9 @@ This module provides the management interface for hosts/admins to control access
 
 ## Implementation Checklist
 
-- [ ] Step 1: Define admin SPA information architecture and guarded route map.
+- [x] Step 1: Define admin SPA information architecture and guarded route map.
  Check later: unauthorized users cannot access admin routes.
-- [ ] Step 2: Implement authentication and session handling for admin access.
+- [x] Step 2: Implement authentication and session handling for admin access.
  Check later: login, logout, and session expiry behavior are correct.
 - [ ] Step 3: Implement access code list view with filters for state and time windows.
  Check later: active, upcoming, and inactive codes can be differentiated quickly.
@@ -75,15 +75,22 @@ This module provides the management interface for hosts/admins to control access
  Check later: destructive actions are intentional and audit-visible.
 - [ ] Step 6: Implement code usage counters and lifecycle indicators in list/detail views.
  Check later: used_count and max_uses are always consistent with backend data.
-- [ ] Step 7: Implement device status panel using last_seen-derived online or offline state.
+- [x] Step 7: Implement device status panel using last_seen-derived online or offline state.
  Check later: stale status is highlighted within defined threshold rules.
-- [ ] Step 8: Implement command history view with statuses and timestamps.
+- [x] Step 8: Implement command history view with statuses and timestamps.
  Check later: pending, delivered, done, failed, and expired states are understandable.
-- [ ] Step 9: Implement manual door-open action with clear safety confirmation.
+- [x] Step 9: Implement manual door-open action with clear safety confirmation.
  Check later: action result is visible and tracked in command history.
 - [ ] Step 10: Implement access and audit log views with useful filters.
  Check later: security-relevant events are searchable by time and apartment.
-- [ ] Step 11: Add responsive behavior for desktop and mobile admin scenarios.
+- [x] Step 11: Add responsive behavior for desktop and mobile admin scenarios.
  Check later: primary workflows remain usable on smaller screens.
 - [ ] Step 12: Add end-to-end validation for critical support workflows.
  Check later: create code, guest use, status update, and fallback manual open all pass.
+
+## Current Implementation Notes
+
+- The SPA currently includes guarded routes, local token session handling, responsive layout, and live views for devices, commands, and logs.
+- Device management (create/list/rotate/delete) is wired to backend and functional with existing API endpoints.
+- Access-code create UI is implemented and wired, but full list/edit/deactivate/delete depends on backend access-code admin endpoints.
+- Manual open action UI is implemented and wired, but depends on a backend manual-open endpoint.
