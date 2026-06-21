@@ -4,6 +4,3 @@ dist
 .vscode
 .env
 node_modules
-dist
-.git
-.vscode
