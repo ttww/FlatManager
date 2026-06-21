@@ -85,27 +85,46 @@ This module implements the device-side logic for secure long polling, command ex
 
 ## Implementation Checklist
 
-- [ ] Step 1: Define firmware project structure, build settings, and environment constants.
+- [x] Step 1: Define firmware project structure, build settings, and environment constants.
  Check later: firmware builds reproducibly for ESP-01S target.
-- [ ] Step 2: Implement safe GPIO and relay initialization with OFF default on boot.
+- [x] Step 2: Implement safe GPIO and relay initialization with OFF default on boot.
  Check later: power-on and reboot never trigger unintended relay activation.
-- [ ] Step 3: Implement Wi-Fi connection manager with reconnect handling.
+- [x] Step 3: Implement Wi-Fi connection manager with reconnect handling.
  Check later: device recovers from Wi-Fi drops without manual intervention.
-- [ ] Step 4: Implement HTTPS client setup and certificate validation strategy.
+- [x] Step 4: Implement HTTPS client setup and certificate validation strategy.
  Check later: only trusted TLS connections to backend are accepted.
-- [ ] Step 5: Implement device authentication header flow for long-poll and result endpoints.
+- [x] Step 5: Implement device authentication header flow for long-poll and result endpoints.
  Check later: missing or invalid token requests fail predictably.
-- [ ] Step 6: Implement long-poll request loop and timeout reconnect behavior.
+- [x] Step 6: Implement long-poll request loop and timeout reconnect behavior.
  Check later: timeout path reconnects immediately with optional jitter.
-- [ ] Step 7: Implement open-command parsing and expiration validation.
+- [x] Step 7: Implement open-command parsing and expiration validation.
  Check later: expired commands are rejected and reported as expired or ignored.
-- [ ] Step 8: Implement relay pulse execution with strict local max duration clamp.
+- [x] Step 8: Implement relay pulse execution with strict local max duration clamp.
  Check later: any duration above max is capped and logged in result message.
-- [ ] Step 9: Implement command-result reporting for done, failed, expired, and ignored states.
+- [x] Step 9: Implement command-result reporting for done, failed, expired, and ignored states.
  Check later: each state is emitted with command_id and diagnostic message.
-- [ ] Step 10: Implement exponential backoff sequence for network/TLS failure cases.
+- [x] Step 10: Implement exponential backoff sequence for network/TLS failure cases.
  Check later: retry timing follows 1s, 2s, 5s, 10s, 30s and then remains capped.
-- [ ] Step 11: Implement watchdog and recovery behavior for stalled loops.
+- [x] Step 11: Implement watchdog and recovery behavior for stalled loops.
  Check later: simulated hangs trigger recovery without unsafe relay state changes.
-- [ ] Step 12: Add hardware-in-the-loop verification plan for relay safety and command latency.
+- [x] Step 12: Add hardware-in-the-loop verification plan for relay safety and command latency.
  Check later: measured pulse duration and response latency stay within requirements.
+- [x] Step 13: Add OTA flashing support and configuration.
+ Check later: OTA update is possible on local network with authenticated access.
+
+## Hardware-in-the-loop Verification Plan
+
+1. Relay boot safety test:
+	- Power cycle device 20x and verify relay never toggles unintentionally.
+2. Relay pulse clamp test:
+	- Send command with `duration_ms` above configured max and verify measured pulse is clamped.
+3. Long-poll latency test:
+	- Measure time from accepted guest open request to relay trigger; validate median and worst case.
+4. Command expiration test:
+	- Send already expired command and verify status is reported as `expired` with no relay pulse.
+5. TLS trust test:
+	- Validate connection works with correct certificate fingerprint and fails with invalid fingerprint.
+6. Reconnect/backoff test:
+	- Simulate AP outage and verify retry sequence follows 1s, 2s, 5s, 10s, 30s max.
+7. OTA authorization test:
+	- Verify OTA requires configured password and update cannot start without it.

@@ -2,6 +2,8 @@
     "cSpell.words": [
         "flatmanager"
     ],
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/esp8266/compile_commands.json",
+    "C_Cpp.default.configurationProvider": "platformio.platformio-ide",
     "python.defaultInterpreterPath": "${workspaceFolder}/api/.venv/bin/python",
     "python.analysis.extraPaths": [
         "${workspaceFolder}/api/src"
