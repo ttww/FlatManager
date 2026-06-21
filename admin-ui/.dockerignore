@@ -3,3 +3,7 @@ dist
 .git
 .vscode
 .env
+node_modules
+dist
+.git
+.vscode
