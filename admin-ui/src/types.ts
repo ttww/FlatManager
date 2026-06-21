@@ -65,3 +65,17 @@ export type AccessCodeForm = {
   booking_reference?: string;
   guest_name?: string;
 };
+
+export type AccessCodeSummary = {
+  id: number;
+  apartment_id: string;
+  valid_from: string;
+  valid_until: string;
+  max_uses: number;
+  used_count: number;
+  active: boolean;
+  booking_reference: string | null;
+  guest_name: string | null;
+  created_at: string;
+  updated_at: string;
+};

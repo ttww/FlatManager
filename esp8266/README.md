@@ -23,6 +23,27 @@ pio run -t upload
 pio device monitor
 ```
 
+## OTA upload with PlatformIO
+
+When the ESP is already on Wi-Fi, upload the next firmware over the network:
+
+```bash
+ESP_OTA_PASSWORD=YOUR_OTA_PASSWORD ESP_HOST_IP=$(ipconfig getifaddr en0) pio run -e esp01_1m_ota -t upload
+```
+
+- The default OTA host is `flatmanager-front-door.local`.
+- If mDNS is not working, override it with the device IP:
+	```bash
+	ESP_OTA_PASSWORD=YOUR_OTA_PASSWORD ESP_HOST_IP=$(ipconfig getifaddr en0) pio run -e esp01_1m_ota -t upload --upload-port 192.168.0.123
+	```
+- The password is not stored in `platformio.ini`; it is taken from `ESP_OTA_PASSWORD`.
+- `ESP_HOST_IP` selects the local source interface for OTA packets and avoids intermittent `No route to host` errors on systems with multiple active network interfaces.
+
+## Debug logging
+
+- The build enables ESP8266 core debug output on `Serial` via `build_flags`.
+- The first ROM boot message is still printed at `74880` baud by the chip itself, so if you want that line too, open a separate monitor at `74880` immediately after reset.
+
 ## Configuration constants
 Set values in `platformio.ini` `build_flags`:
 - `FM_WIFI_SSID`
@@ -50,3 +71,4 @@ Set values in `platformio.ini` `build_flags`:
 - OTA works over local network when Wi-Fi is connected.
 - Keep `FM_OTA_PASSWORD` non-empty in production.
 - TLS certificate fingerprint must match backend certificate, otherwise requests are rejected.
+- ESP-01 1M is configured with `eagle.flash.1m64.ld` so OTA has enough room; if layout is changed to larger FS variants, OTA may fail with `OTA error: 1` (begin error).

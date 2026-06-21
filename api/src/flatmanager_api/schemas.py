@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class GuestOpenRequest(BaseModel):
@@ -72,6 +72,8 @@ class AdminRotateTokenResponse(BaseModel):
 
 
 class CommandSummaryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     apartment_id: str
     device_id: int
@@ -85,6 +87,8 @@ class CommandSummaryResponse(BaseModel):
 
 
 class AccessLogSummaryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     apartment_id: str
     timestamp: datetime
@@ -92,3 +96,51 @@ class AccessLogSummaryResponse(BaseModel):
     result: str
     reason: str | None
     command_id: int | None
+
+
+class AdminAccessCodeCreateRequest(BaseModel):
+    apartment_id: str = Field(min_length=1, max_length=100)
+    code: str = Field(min_length=4, max_length=12)
+    valid_from: datetime
+    valid_until: datetime
+    max_uses: int = Field(default=20, ge=1, le=10000)
+    booking_reference: str | None = Field(default=None, max_length=120)
+    guest_name: str | None = Field(default=None, max_length=120)
+
+
+class AdminAccessCodeUpdateRequest(BaseModel):
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+    max_uses: int | None = Field(default=None, ge=1, le=10000)
+    booking_reference: str | None = None
+    guest_name: str | None = None
+    active: bool | None = None
+
+
+class AdminAccessCodeSummaryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    apartment_id: str
+    valid_from: datetime
+    valid_until: datetime
+    max_uses: int
+    used_count: int
+    active: bool
+    booking_reference: str | None
+    guest_name: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminManualOpenRequest(BaseModel):
+    apartment_id: str = Field(min_length=1, max_length=100)
+    duration_ms: int | None = Field(default=None, ge=100, le=10000)
+
+
+class AdminManualOpenResponse(BaseModel):
+    status: str
+    message: str
+    command_id: int
+    apartment_id: str
+    device_id: int

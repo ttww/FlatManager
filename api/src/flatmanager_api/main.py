@@ -1,5 +1,6 @@
 import uvicorn
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from . import models  # noqa: F401
 from .api_routes import router as api_router
@@ -10,6 +11,14 @@ app = FastAPI(
     title=settings.app_name,
     debug=settings.app_debug,
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_allowed_origins,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(api_router)
 
 

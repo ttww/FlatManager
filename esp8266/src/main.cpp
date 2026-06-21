@@ -25,7 +25,8 @@ namespace
     bool g_time_synced = false;
     uint8_t g_backoff_index = 0;
 
-    constexpr uint32_t kBackoffScheduleMs[] = {1000, 2000, 5000, 10000, 30000};
+    // constexpr uint32_t kBackoffScheduleMs[] = {1000, 2000, 5000, 10000, 30000};
+    constexpr uint32_t kBackoffScheduleMs[] = {1000, 1000, 1000, 1000, 1000};
 
     uint32_t next_backoff_delay_ms()
     {
@@ -39,6 +40,62 @@ namespace
     }
 
     void reset_backoff() { g_backoff_index = 0; }
+
+    const char *wifi_status_name(wl_status_t status)
+    {
+        switch (status)
+        {
+        case WL_NO_SHIELD:
+            return "WL_NO_SHIELD";
+        case WL_IDLE_STATUS:
+            return "WL_IDLE_STATUS";
+        case WL_NO_SSID_AVAIL:
+            return "WL_NO_SSID_AVAIL";
+        case WL_SCAN_COMPLETED:
+            return "WL_SCAN_COMPLETED";
+        case WL_CONNECTED:
+            return "WL_CONNECTED";
+        case WL_CONNECT_FAILED:
+            return "WL_CONNECT_FAILED";
+        case WL_CONNECTION_LOST:
+            return "WL_CONNECTION_LOST";
+        case WL_DISCONNECTED:
+            return "WL_DISCONNECTED";
+        default:
+            return "WL_UNKNOWN";
+        }
+    }
+
+    const char *poll_result_name(PollResult result)
+    {
+        switch (result)
+        {
+        case PollResult::kNoCommand:
+            return "no_command";
+        case PollResult::kProcessed:
+            return "processed";
+        case PollResult::kTransientError:
+            return "transient_error";
+        case PollResult::kAuthError:
+            return "auth_error";
+        default:
+            return "unknown";
+        }
+    }
+
+    void log_wifi_status()
+    {
+        const String ssid = WiFi.SSID();
+        const String ip = WiFi.localIP().toString();
+        const String gateway = WiFi.gatewayIP().toString();
+        Serial.printf(
+            "Wi-Fi status=%s ssid=%s rssi=%d ip=%s gateway=%s\n",
+            wifi_status_name(WiFi.status()),
+            ssid.c_str(),
+            WiFi.RSSI(),
+            ip.c_str(),
+            gateway.c_str());
+    }
 
     void service_background()
     {
@@ -86,25 +143,64 @@ namespace
         return url;
     }
 
+    bool url_is_https(const String &url)
+    {
+        return url.startsWith("https://");
+    }
+
     bool has_tls_fingerprint() { return strlen(cfg::kTlsCertFingerprint) > 0; }
+
+    std::unique_ptr<WiFiClient> make_http_client(const String &url)
+    {
+        if (url_is_https(url))
+        {
+            if (!has_tls_fingerprint())
+            {
+                Serial.println("TLS fingerprint missing. Refusing HTTPS connection.");
+                return nullptr;
+            }
+
+            auto client = std::make_unique<BearSSL::WiFiClientSecure>();
+            client->setTimeout(cfg::kHttpTimeoutMs / 1000);
+            client->setFingerprint(cfg::kTlsCertFingerprint);
+            return client;
+        }
+
+        if (!url.startsWith("http://"))
+        {
+            Serial.printf("Unsupported API base URL scheme: %s\n", url.c_str());
+            return nullptr;
+        }
+
+        auto client = std::make_unique<WiFiClient>();
+        client->setTimeout(cfg::kHttpTimeoutMs / 1000);
+        return client;
+    }
+
+    String format_connected_endpoint(HTTPClient &http)
+    {
+        WiFiClient *stream = http.getStreamPtr();
+        if (stream == nullptr)
+        {
+            return String("unknown");
+        }
+
+        const IPAddress remote_ip = stream->remoteIP();
+        const uint16_t remote_port = stream->remotePort();
+        if (remote_port == 0)
+        {
+            return String("unknown");
+        }
+
+        String endpoint = remote_ip.toString();
+        endpoint += ':';
+        endpoint += remote_port;
+        return endpoint;
+    }
 
     uint16_t http_timeout_ms()
     {
         return cfg::kHttpTimeoutMs > 65000 ? 65000 : static_cast<uint16_t>(cfg::kHttpTimeoutMs);
-    }
-
-    std::unique_ptr<BearSSL::WiFiClientSecure> make_secure_client()
-    {
-        if (!has_tls_fingerprint())
-        {
-            Serial.println("TLS fingerprint missing. Refusing insecure connection.");
-            return nullptr;
-        }
-
-        auto client = std::make_unique<BearSSL::WiFiClientSecure>();
-        client->setTimeout(cfg::kHttpTimeoutMs / 1000);
-        client->setFingerprint(cfg::kTlsCertFingerprint);
-        return client;
     }
 
     void initialize_ota_once()
@@ -139,24 +235,42 @@ namespace
             return true;
         }
 
+        WiFi.persistent(false);
         WiFi.mode(WIFI_STA);
+        WiFi.hostname(cfg::kDeviceName);
+        WiFi.setAutoReconnect(true);
         WiFi.begin(cfg::kWifiSsid, cfg::kWifiPassword);
-        Serial.printf("Connecting Wi-Fi SSID: %s\n", cfg::kWifiSsid);
+        Serial.printf("Connecting Wi-Fi ssid=%s hostname=%s\n", cfg::kWifiSsid, cfg::kDeviceName);
 
         const uint32_t start = millis();
+        uint32_t last_log_at = 0;
         while (WiFi.status() != WL_CONNECTED)
         {
             service_background();
             delay(200);
 
-            if (millis() - start > cfg::kWifiConnectTimeoutMs)
+            const uint32_t elapsed = millis() - start;
+            if (elapsed - last_log_at >= 2000)
             {
-                Serial.println("Wi-Fi connect timeout");
+                last_log_at = elapsed;
+                Serial.printf(
+                    "Waiting for Wi-Fi... status=%s elapsed=%lu ms\n",
+                    wifi_status_name(WiFi.status()),
+                    static_cast<unsigned long>(elapsed));
+            }
+
+            if (elapsed > cfg::kWifiConnectTimeoutMs)
+            {
+                Serial.printf(
+                    "Wi-Fi connect timeout after %lu ms (status=%s)\n",
+                    static_cast<unsigned long>(elapsed),
+                    wifi_status_name(WiFi.status()));
                 return false;
             }
         }
 
-        Serial.printf("Wi-Fi connected. IP: %s\n", WiFi.localIP().toString().c_str());
+        Serial.println("Wi-Fi connected");
+        log_wifi_status();
         initialize_ota_once();
         return true;
     }
@@ -169,7 +283,11 @@ namespace
         }
 
         configTime(0, 0, cfg::kNtpServer1, cfg::kNtpServer2, cfg::kNtpServer3);
-        Serial.println("Waiting for NTP time sync...");
+        Serial.printf(
+            "Waiting for NTP time sync via %s, %s, %s\n",
+            cfg::kNtpServer1,
+            cfg::kNtpServer2,
+            cfg::kNtpServer3);
 
         const uint32_t start = millis();
         while (true)
@@ -235,6 +353,10 @@ namespace
         }
         if (requested_ms > cfg::kMaxRelayPulseMs)
         {
+            Serial.printf(
+                "Relay duration clamped from %lu to %lu ms\n",
+                static_cast<unsigned long>(requested_ms),
+                static_cast<unsigned long>(cfg::kMaxRelayPulseMs));
             return cfg::kMaxRelayPulseMs;
         }
         return requested_ms;
@@ -242,16 +364,17 @@ namespace
 
     bool post_command_result(int command_id, const char *status_value, const String &message)
     {
-        auto client = make_secure_client();
+        const String target_url = build_url(cfg::kCommandResultPath);
+        auto client = make_http_client(target_url);
         if (!client)
         {
             return false;
         }
 
         HTTPClient https;
-        if (!https.begin(*client, build_url(cfg::kCommandResultPath)))
+        if (!https.begin(*client, target_url))
         {
-            Serial.println("Failed to begin command-result request");
+            Serial.printf("Failed to begin command-result request target=%s\n", target_url.c_str());
             return false;
         }
 
@@ -281,7 +404,10 @@ namespace
     bool pulse_relay_and_report(int command_id, uint32_t duration_ms)
     {
         const uint32_t safe_duration_ms = clamp_duration_ms(duration_ms);
-        Serial.printf("Relay pulse %lu ms\n", static_cast<unsigned long>(safe_duration_ms));
+        Serial.printf(
+            "Relay pulse command_id=%d duration_ms=%lu\n",
+            command_id,
+            static_cast<unsigned long>(safe_duration_ms));
 
         set_relay_state(true);
         safe_delay_ms(safe_duration_ms);
@@ -307,12 +433,14 @@ namespace
         const char *command = doc["command"] | "none";
         if (strcmp(command, "none") == 0)
         {
+            Serial.println("No command available");
             const uint32_t jitter = random(cfg::kReconnectJitterMinMs, cfg::kReconnectJitterMaxMs + 1);
             safe_delay_ms(jitter);
             return PollResult::kNoCommand;
         }
 
         const int command_id = doc["command_id"] | -1;
+        Serial.printf("Received command=%s command_id=%d\n", command, command_id);
         if (strcmp(command, "open") != 0 || command_id < 0)
         {
             if (command_id >= 0)
@@ -325,11 +453,17 @@ namespace
         const char *expires_at = doc["expires_at"] | "";
         if (is_expired_iso8601_utc(expires_at))
         {
+            Serial.printf("Command expired command_id=%d expires_at=%s\n", command_id, expires_at);
             post_command_result(command_id, "expired", "Command expired before execution");
             return PollResult::kProcessed;
         }
 
         const uint32_t requested_duration = doc["duration_ms"] | cfg::kMaxRelayPulseMs;
+        Serial.printf(
+            "Open command accepted command_id=%d requested_duration_ms=%lu expires_at=%s\n",
+            command_id,
+            static_cast<unsigned long>(requested_duration),
+            expires_at);
         if (!pulse_relay_and_report(command_id, requested_duration))
         {
             post_command_result(command_id, "failed", "Relay execution done but report failed");
@@ -340,16 +474,17 @@ namespace
 
     PollResult wait_for_command_once()
     {
-        auto client = make_secure_client();
+        const String target_url = build_url(cfg::kWaitCommandPath);
+        auto client = make_http_client(target_url);
         if (!client)
         {
             return PollResult::kAuthError;
         }
 
         HTTPClient https;
-        if (!https.begin(*client, build_url(cfg::kWaitCommandPath)))
+        if (!https.begin(*client, target_url))
         {
-            Serial.println("Failed to begin wait-command request");
+            Serial.printf("Failed to begin wait-command request target=%s\n", target_url.c_str());
             return PollResult::kTransientError;
         }
 
@@ -357,21 +492,36 @@ namespace
         https.addHeader("Authorization", make_authorization_header());
 
         const int code = https.GET();
+        const String endpoint = format_connected_endpoint(https);
         if (code == HTTP_CODE_UNAUTHORIZED || code == HTTP_CODE_FORBIDDEN)
         {
-            Serial.printf("Auth error on wait-command: %d\n", code);
+            Serial.printf(
+                "Auth error on wait-command: %d target=%s remote=%s\n",
+                code,
+                target_url.c_str(),
+                endpoint.c_str());
             https.end();
             return PollResult::kAuthError;
         }
 
         if (code != HTTP_CODE_OK)
         {
-            Serial.printf("wait-command HTTP status: %d\n", code);
+            Serial.printf(
+                "wait-command HTTP status: %d target=%s remote=%s\n",
+                code,
+                target_url.c_str(),
+                endpoint.c_str());
             https.end();
             return PollResult::kTransientError;
         }
 
         const String body = https.getString();
+        Serial.printf(
+            "wait-command HTTP status: %d target=%s remote=%s response_bytes=%u\n",
+            code,
+            target_url.c_str(),
+            endpoint.c_str(),
+            static_cast<unsigned>(body.length()));
         https.end();
         return process_wait_command_response(body);
     }
@@ -381,6 +531,8 @@ namespace
         Serial.println();
         Serial.println("FlatManager ESP8266 boot");
         Serial.printf("Device: %s\n", cfg::kDeviceName);
+        Serial.printf("API base: %s\n", cfg::kApiBaseUrl);
+        Serial.printf("Wi-Fi SSID: %s\n", cfg::kWifiSsid);
         Serial.printf("Relay pin: %u\n", cfg::kRelayPin);
         Serial.printf("Relay active high: %s\n", cfg::kRelayActiveHigh ? "true" : "false");
         Serial.printf("Max relay pulse ms: %lu\n", static_cast<unsigned long>(cfg::kMaxRelayPulseMs));
@@ -390,15 +542,32 @@ namespace
         Serial.printf("Wi-Fi timeout ms: %lu\n", static_cast<unsigned long>(cfg::kWifiConnectTimeoutMs));
     }
 
+    void print_reset_info()
+    {
+        Serial.printf("Reset reason: %s\n", ESP.getResetReason().c_str());
+        Serial.printf("Reset info: %s\n", ESP.getResetInfo().c_str());
+    }
+
 } // namespace
 
 void setup()
 {
     Serial.begin(115200);
+    Serial.setDebugOutput(true);
+    delay(2000);
+    Serial.println();
+    Serial.println("FlatManager ESP8266 starting up...");
+    print_reset_info();
     delay(300);
+
     randomSeed(micros());
+
+    Serial.println("Boot stage: random seed done");
+
     ESP.wdtEnable(8000);
+    Serial.println("Boot stage: watchdog enabled");
     init_relay_gpio();
+    Serial.println("Boot stage: relay GPIO initialized");
     print_boot_configuration();
 }
 
@@ -417,6 +586,7 @@ void loop()
     sync_time_if_needed();
 
     const PollResult result = wait_for_command_once();
+    Serial.printf("Poll result: %s\n", poll_result_name(result));
     if (result == PollResult::kNoCommand || result == PollResult::kProcessed)
     {
         reset_backoff();

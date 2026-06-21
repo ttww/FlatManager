@@ -31,6 +31,15 @@ class Settings(BaseSettings):
 
     device_online_threshold_seconds: int = Field(default=90)
 
+    cors_allowed_origins: list[str] = Field(
+        default=[
+            "http://localhost:8080",
+            "http://localhost:8081",
+            "http://localhost:5173",
+            "http://localhost:5174",
+        ]
+    )
+
     rate_limit_window_seconds: int = Field(default=300)
     rate_limit_ip_max_attempts: int = Field(default=20)
     rate_limit_apartment_max_attempts: int = Field(default=50)
