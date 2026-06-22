@@ -1,4 +1,4 @@
-# ESP8266 Firmware Requirements (ESP-01S, PlatformIO)
+# ESP Firmware Requirements (ESP8266 ESP-01S and ESP32-S2 LOLIN S2 Mini, PlatformIO)
 
 ## Cross-Module Reference
 
@@ -10,9 +10,20 @@ This module implements the device-side logic for secure long polling, command ex
 
 ## Hardware Context
 
-- ESP8266 ESP-01S
+- ESP8266 ESP-01S target
+- ESP32-S2 LOLIN S2 Mini target
 - Relay module
 - Separate power supply for door opener
+- Board-specific GPIO mapping configured via PlatformIO build flags
+
+## Supported PlatformIO Targets
+
+- `esp01_1m`: ESP8266 ESP-01S USB/serial flashing target.
+- `esp01_1m_ota`: ESP8266 ESP-01S OTA flashing target.
+- `lolin_s2_mini`: ESP32-S2 LOLIN S2 Mini USB/serial flashing target.
+- `lolin_s2_mini_ota`: ESP32-S2 LOLIN S2 Mini OTA flashing target.
+
+Common firmware behavior must remain shared where possible. Board-specific differences must be isolated through PlatformIO environments, build flags, and small platform abstraction helpers in code.
 
 ## Core Responsibilities
 
@@ -64,6 +75,12 @@ This module implements the device-side logic for secure long polling, command ex
 - If server sends a larger duration, firmware must clamp to local max.
 - Use watchdog/recovery mechanisms.
 - Use proper relay protection for inductive loads (or suitable relay module design).
+- Relay GPIO must be board-specific:
+	- ESP8266 ESP-01S default relay pin: `FM_RELAY_PIN=2`.
+	- ESP32-S2 LOLIN S2 Mini default relay pin: `FM_RELAY_PIN=16`.
+- LED GPIO must be board-specific:
+	- ESP8266 ESP-01S default LED pin: `FM_LED_PIN=2` if shared/available.
+	- ESP32-S2 LOLIN S2 Mini default LED pin: `FM_LED_PIN=15`.
 
 ## Security Requirements
 
@@ -71,12 +88,24 @@ This module implements the device-side logic for secure long polling, command ex
 - Only outbound HTTPS to server is allowed.
 - Device token must be long and random.
 - Token must never be exposed in guest-facing context.
+- ESP8266 HTTPS validation uses the configured certificate fingerprint strategy.
+- ESP32-S2 HTTPS validation uses a Root CA certificate include file, generated as `include/root_ca.h`.
+- ESP32-S2 must not use `setInsecure()` during normal production operation.
+- The generated Root CA header must include:
+	- PEM certificate string `kRootCa`.
+	- Unix expiry timestamp `kRootCaNotAfterUnix`.
+	- ISO-8601 expiry string `kRootCaNotAfterIso8601`.
+- Firmware must warn before Root CA expiration using `FM_ROOT_CA_WARN_BEFORE_DAYS`.
+- Firmware must refuse HTTPS after Root CA expiration unless `FM_ALLOW_INSECURE_TLS_AFTER_CA_EXPIRE=1` is explicitly configured.
+- Default behavior must keep `FM_ALLOW_INSECURE_TLS_AFTER_CA_EXPIRE=0`.
 
 ## Reliability and Operations
 
 - Continue operation after transient failures.
 - Maintain low latency for command handling through long polling.
 - Provide predictable behavior when commands are expired or malformed.
+- OTA must remain available on the local network where possible, even if backend HTTPS validation fails because the Root CA expired.
+- Root CA renewal must be supported by a script that downloads the CA, validates metadata, and regenerates `include/root_ca.h`.
 
 ## Out of Scope for This Module File
 
@@ -91,8 +120,8 @@ This module implements the device-side logic for secure long polling, command ex
  Check later: power-on and reboot never trigger unintended relay activation.
 - [x] Step 3: Implement Wi-Fi connection manager with reconnect handling.
  Check later: device recovers from Wi-Fi drops without manual intervention.
-- [x] Step 4: Implement HTTPS client setup and certificate validation strategy.
- Check later: only trusted TLS connections to backend are accepted.
+- [x] Step 4: Implement HTTPS client setup and certificate validation strategy for ESP8266 and ESP32-S2.
+ Check later: ESP8266 accepts only the configured fingerprint; ESP32-S2 accepts only the configured Root CA and refuses expired CA by default.
 - [x] Step 5: Implement device authentication header flow for long-poll and result endpoints.
  Check later: missing or invalid token requests fail predictably.
 - [x] Step 6: Implement long-poll request loop and timeout reconnect behavior.
@@ -111,6 +140,14 @@ This module implements the device-side logic for secure long polling, command ex
  Check later: measured pulse duration and response latency stay within requirements.
 - [x] Step 13: Add OTA flashing support and configuration.
  Check later: OTA update is possible on local network with authenticated access.
+- [x] Step 14: Add ESP32-S2 LOLIN S2 Mini PlatformIO environment.
+ Check later: `pio run -e lolin_s2_mini` builds successfully.
+- [x] Step 15: Add board-specific relay and LED build flags.
+ Check later: ESP8266 and ESP32-S2 use separate GPIO mappings without duplicated common flags.
+- [x] Step 16: Add Root CA generation flow for ESP32-S2 TLS validation.
+ Check later: `include/root_ca.h` contains `kRootCa`, `kRootCaNotAfterUnix`, and `kRootCaNotAfterIso8601`.
+- [x] Step 17: Add Root CA expiry handling.
+ Check later: firmware warns before expiry and refuses HTTPS after expiry unless insecure fallback is explicitly enabled.
 
 ## Hardware-in-the-loop Verification Plan
 
@@ -123,8 +160,15 @@ This module implements the device-side logic for secure long polling, command ex
 4. Command expiration test:
 	- Send already expired command and verify status is reported as `expired` with no relay pulse.
 5. TLS trust test:
-	- Validate connection works with correct certificate fingerprint and fails with invalid fingerprint.
+	- ESP8266: validate connection works with correct certificate fingerprint and fails with invalid fingerprint.
+	- ESP32-S2: validate connection works with generated Root CA and fails with invalid or expired Root CA.
 6. Reconnect/backoff test:
 	- Simulate AP outage and verify retry sequence follows 1s, 2s, 5s, 10s, 30s max.
 7. OTA authorization test:
 	- Verify OTA requires configured password and update cannot start without it.
+8. ESP32-S2 GPIO test:
+	- Verify relay output uses GPIO16 and LED output uses GPIO15.
+9. Root CA renewal test:
+	- Run the Root CA update script on macOS and Linux and verify the generated header is identical except for generation metadata.
+10. Root CA expiry behavior test:
+	- Simulate an expired `kRootCaNotAfterUnix` value and verify HTTPS is refused while OTA remains reachable on the local network.

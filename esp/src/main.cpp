@@ -1,12 +1,22 @@
 #include <Arduino.h>
 
 #include <ArduinoJson.h>
-#include <ESP8266HTTPClient.h>
+#include <ArduinoOTA.h>
+#include <HTTPClient.h>
+#include <time.h>
+#include <memory>
+
+#if defined(ESP8266)
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <WiFiClientSecureBearSSL.h>
-#include <ArduinoOTA.h>
-#include <time.h>
+#elif defined(ESP32)
+#include <WiFi.h>
+#include <ESPmDNS.h>
+#include <WiFiClientSecure.h>
+#else
+#error "Unsupported platform"
+#endif
 
 #include "firmware_config.h"
 
@@ -24,6 +34,31 @@ namespace
     bool g_ota_initialized = false;
     bool g_time_synced = false;
     uint8_t g_backoff_index = 0;
+
+    void feed_watchdog()
+    {
+#if defined(ESP8266)
+        ESP.wdtFeed();
+#else
+        yield();
+#endif
+    }
+
+    void enable_watchdog()
+    {
+#if defined(ESP8266)
+        ESP.wdtEnable(8000);
+#endif
+    }
+
+    void set_wifi_hostname(const char *hostname)
+    {
+#if defined(ESP8266)
+        WiFi.hostname(hostname);
+#elif defined(ESP32)
+        WiFi.setHostname(hostname);
+#endif
+    }
 
     // constexpr uint32_t kBackoffScheduleMs[] = {1000, 2000, 5000, 10000, 30000};
     constexpr uint32_t kBackoffScheduleMs[] = {1000, 1000, 1000, 1000, 1000};
@@ -103,7 +138,7 @@ namespace
         {
             ArduinoOTA.handle();
         }
-        ESP.wdtFeed();
+        feed_watchdog();
         yield();
     }
 
@@ -154,6 +189,7 @@ namespace
     {
         if (url_is_https(url))
         {
+#if defined(ESP8266)
             if (!has_tls_fingerprint())
             {
                 Serial.println("TLS fingerprint missing. Refusing HTTPS connection.");
@@ -164,6 +200,13 @@ namespace
             client->setTimeout(cfg::kHttpTimeoutMs / 1000);
             client->setFingerprint(cfg::kTlsCertFingerprint);
             return client;
+#elif defined(ESP32)
+            auto client = std::make_unique<WiFiClientSecure>();
+            client->setTimeout(cfg::kHttpTimeoutMs / 1000);
+            client->setInsecure();
+            Serial.println("HTTPS certificate validation disabled on ESP32. Use a CA certificate for production.");
+            return client;
+#endif
         }
 
         if (!url.startsWith("http://"))
@@ -237,7 +280,7 @@ namespace
 
         WiFi.persistent(false);
         WiFi.mode(WIFI_STA);
-        WiFi.hostname(cfg::kDeviceName);
+        set_wifi_hostname(cfg::kDeviceName);
         WiFi.setAutoReconnect(true);
         WiFi.begin(cfg::kWifiSsid, cfg::kWifiPassword);
         Serial.printf("Connecting Wi-Fi ssid=%s hostname=%s\n", cfg::kWifiSsid, cfg::kDeviceName);
@@ -529,7 +572,11 @@ namespace
     void print_boot_configuration()
     {
         Serial.println();
+#if defined(ESP8266)
         Serial.println("FlatManager ESP8266 boot");
+#elif defined(ESP32)
+        Serial.println("FlatManager ESP32 boot");
+#endif
         Serial.printf("Device: %s\n", cfg::kDeviceName);
         Serial.printf("API base: %s\n", cfg::kApiBaseUrl);
         Serial.printf("Wi-Fi SSID: %s\n", cfg::kWifiSsid);
@@ -544,8 +591,12 @@ namespace
 
     void print_reset_info()
     {
+#if defined(ESP8266)
         Serial.printf("Reset reason: %s\n", ESP.getResetReason().c_str());
         Serial.printf("Reset info: %s\n", ESP.getResetInfo().c_str());
+#elif defined(ESP32)
+        Serial.printf("Reset reason: %d\n", static_cast<int>(esp_reset_reason()));
+#endif
     }
 
 } // namespace
@@ -556,7 +607,11 @@ void setup()
     Serial.setDebugOutput(true);
     delay(2000);
     Serial.println();
+#if defined(ESP8266)
     Serial.println("FlatManager ESP8266 starting up...");
+#elif defined(ESP32)
+    Serial.println("FlatManager ESP32 starting up...");
+#endif
     print_reset_info();
     delay(300);
 
@@ -564,7 +619,7 @@ void setup()
 
     Serial.println("Boot stage: random seed done");
 
-    ESP.wdtEnable(8000);
+    enable_watchdog();
     Serial.println("Boot stage: watchdog enabled");
     init_relay_gpio();
     Serial.println("Boot stage: relay GPIO initialized");
