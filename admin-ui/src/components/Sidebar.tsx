@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { clearAdminToken } from "../lib/session";
 
 const links = [
+  { to: "/apartments", label: "Apartments" },
   { to: "/codes", label: "Access Codes" },
   { to: "/devices", label: "Devices" },
   { to: "/commands", label: "Commands" },
