@@ -17,6 +17,7 @@ function detectInitialLocale(): Locale {
   if (browserLocale.startsWith("zh")) return "zh";
   if (browserLocale.startsWith("ko")) return "ko";
   if (browserLocale.startsWith("ar")) return "ar";
+  if (browserLocale.startsWith("he")) return "he";
   if (browserLocale.startsWith("fr")) return "fr";
   if (browserLocale.startsWith("es")) return "es";
   if (browserLocale.startsWith("pt")) return "pt";

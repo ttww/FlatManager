@@ -7,6 +7,7 @@ export type Locale =
   | "eo"
   | "es"
   | "fr"
+  | "he"
   | "hi"
   | "hu"
   | "ja"
@@ -397,6 +398,27 @@ export const messages: Record<Locale, Dictionary> = {
     requiredApartment: "Το διαμερισμα ειναι υποχρεωτικο.",
     invalidCode: "Παρακαλω εισαγαγετε αριθμητικο κωδικο 4 εως 8 ψηφιων.",
   },
+  he: {
+    appTitle: "פתח דלת כניסה",
+    subtitle: "הכנס קוד אורח כדי לבקש פתיחת דלת.",
+    apartmentLabel: "דירה",
+    apartmentPlaceholder: "למשל apartment-01",
+    codeLabel: "קוד גישה",
+    codePlaceholder: "קוד 6 ספרות",
+    submit: "פתח דלת",
+    submitting: "שליחה...",
+    neutralDenied: "הקוד אינו תקף או אינו עוד תקף.",
+    accepted: "בקשת פתיחת הדלת נשלחה. אנא המתן רגע.",
+    networkError: "בעיה בתקשורת. אנא נסה שוב.",
+    timeoutError: "הבקשה לקחה יותר מדי זמן. אנא נסה שוב.",
+    rateLimited: "אנא המתן רגע לפני ניסיון חוזר.",
+    offlineHint: "נראה שאתה במצב לא מקוון.",
+    retryHint: "אם זה ממשיך, אנא פנה למארח לקבלת עזרה.",
+    language: "שפה",
+    contactHost: "אנא פנה למארח לקבלת עזרה.",
+    requiredApartment: "שדה הדירה הוא חובה.",
+    invalidCode: "אנא הכנס קוד מספרי של 4 עד 8 ספרות.",
+  },
 };
 
 export const localeMeta: Record<Locale, { lang: string; dir: "ltr" | "rtl" }> = {
@@ -408,6 +430,7 @@ export const localeMeta: Record<Locale, { lang: string; dir: "ltr" | "rtl" }> = 
   eo: { lang: "eo", dir: "ltr" },
   es: { lang: "es", dir: "ltr" },
   fr: { lang: "fr", dir: "ltr" },
+  he: { lang: "he", dir: "rtl" },
   hi: { lang: "hi", dir: "ltr" },
   hu: { lang: "hu", dir: "ltr" },
   ja: { lang: "ja", dir: "ltr" },
@@ -428,6 +451,7 @@ export const localeOptions: Array<{ value: Locale; label: string }> = [
   { value: "eo", label: "⭐ Esperanto" },
   { value: "es", label: "🇪🇸 Spanish" },
   { value: "fr", label: "🇫🇷 French" },
+  { value: "he", label: "🇮🇱 Hebrew" },
   { value: "hi", label: "🇮🇳 Hindi" },
   { value: "hu", label: "🇭🇺 Hungarian" },
   { value: "ja", label: "🇯🇵 Japanese" },

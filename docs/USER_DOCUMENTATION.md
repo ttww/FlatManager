@@ -106,6 +106,41 @@ If code is wrong/expired/inactive, the user sees a denial message.
 
 ---
 
+## 2.4 Multilingual Interface (18 Languages)
+
+FlatManager supports **18 languages** with full interface localization. Guests can select their preferred language from the dropdown at the top of the page.
+
+#### 🇬🇧 English & Western European
+
+| Language | Screenshot | Language | Screenshot |
+|----------|-----------|----------|-----------|
+| **English** | ![en](./screenshots/guest-en.png) | **German** | ![de](./screenshots/guest-de.png) |
+| **French** | ![fr](./screenshots/guest-fr.png) | **Spanish** | ![es](./screenshots/guest-es.png) |
+| **Portuguese** | ![pt](./screenshots/guest-pt.png) | **Esperanto** | ![eo](./screenshots/guest-eo.png) |
+
+#### 🇪🇺 Eastern European & Mediterranean
+
+| Language | Screenshot | Language | Screenshot |
+|----------|-----------|----------|-----------|
+| **Czech** | ![cs](./screenshots/guest-cs.png) | **Polish** | ![pl](./screenshots/guest-pl.png) |
+| **Hungarian** | ![hu](./screenshots/guest-hu.png) | **Ukrainian** | ![uk](./screenshots/guest-uk.png) |
+| **Russian** | ![ru](./screenshots/guest-ru.png) | **Greek** | ![el](./screenshots/guest-el.png) |
+
+#### 🌏 Asian Languages
+
+| Language | Screenshot | Language | Screenshot |
+|----------|-----------|----------|-----------|
+| **Japanese** | ![ja](./screenshots/guest-ja.png) | **Chinese** | ![zh](./screenshots/guest-zh.png) |
+| **Korean** | ![ko](./screenshots/guest-ko.png) | **Hindi** | ![hi](./screenshots/guest-hi.png) |
+
+#### 🌍 Middle East & South Asia
+
+| Language | Screenshot | Language | Screenshot |
+|----------|-----------|----------|-----------|
+| **Arabic** | ![ar](./screenshots/guest-ar.png) | **Hebrew** | ![he](./screenshots/guest-he.png) |
+
+---
+
 ## 3. Quick Troubleshooting Checklist
 
 If guests cannot open the door:
