@@ -31,10 +31,12 @@ function detectInitialLocale(): Locale {
 export function GuestOpenPage() {
   const [params] = useSearchParams();
   const [locale, setLocale] = useState<Locale>(detectInitialLocale());
-  const [apartmentId, setApartmentId] = useState(params.get("apartment_id") ?? "");
+  const prefilledApartmentId = params.get("apartment_id");
+  const [apartmentId, setApartmentId] = useState(prefilledApartmentId ?? "");
   const [code, setCode] = useState("");
   const [uiState, setUiState] = useState<UiState>("idle");
   const [errorText, setErrorText] = useState("");
+  const isApartmentLocked = prefilledApartmentId !== null;
 
   const t = messages[locale];
   const currentLocaleMeta = localeMeta[locale];
@@ -46,6 +48,14 @@ export function GuestOpenPage() {
     if (uiState === "network-error") return t.networkError;
     if (uiState === "timeout") return t.timeoutError;
     if (uiState === "rate-limit") return t.rateLimited;
+    return "";
+  }, [t, uiState]);
+
+  const followUpMessage = useMemo(() => {
+    if (uiState === "network-error" || uiState === "timeout" || uiState === "rate-limit") {
+      return t.retryHint;
+    }
+
     return "";
   }, [t, uiState]);
 
@@ -141,14 +151,18 @@ export function GuestOpenPage() {
 
         <form onSubmit={onSubmit} className="guest-form">
           <label htmlFor="apartment">{t.apartmentLabel}</label>
-          <input
-            id="apartment"
-            value={apartmentId}
-            onChange={(event) => setApartmentId(event.target.value)}
-            placeholder={t.apartmentPlaceholder}
-            autoComplete="off"
-            required
-          />
+          {isApartmentLocked ? (
+            <div className="apartment-display">{apartmentId}</div>
+          ) : (
+            <input
+              id="apartment"
+              value={apartmentId}
+              onChange={(event) => setApartmentId(event.target.value)}
+              placeholder={t.apartmentPlaceholder}
+              autoComplete="off"
+              required
+            />
+          )}
 
           <label htmlFor="code">{t.codeLabel}</label>
           <input
@@ -172,8 +186,7 @@ export function GuestOpenPage() {
         {stateMessage ? <p className={`state-message ${uiState}`}>{stateMessage}</p> : null}
 
         {isOffline ? <p className="hint warning">{t.offlineHint}</p> : null}
-        <p className="hint">{t.retryHint}</p>
-        <p className="hint">{t.contactHost}</p>
+        {followUpMessage ? <p className="hint">{followUpMessage}</p> : null}
       </section>
     </main>
   );

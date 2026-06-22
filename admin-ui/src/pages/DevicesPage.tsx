@@ -1,10 +1,20 @@
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 
+import { QrModal } from "../components/QrModal";
 import { api } from "../lib/api";
 import { formatDateTime, statusClass } from "../lib/format";
 import { getAdminToken } from "../lib/session";
 import type { AdminDevice, NewDeviceResponse, RotateDeviceTokenResponse } from "../types";
+
+const GUEST_BASE = import.meta.env.VITE_API_BASE_URL
+  ? import.meta.env.VITE_API_BASE_URL.replace(/\/api$/, "")
+  : window.location.origin;
+
+function guestUrl(apartmentId: string): string {
+  const base = GUEST_BASE.replace(/\/$/, "");
+  return `${base}/guest/?apartment_id=${encodeURIComponent(apartmentId)}`;
+}
 
 export function DevicesPage() {
   const [devices, setDevices] = useState<AdminDevice[]>([]);
@@ -13,6 +23,7 @@ export function DevicesPage() {
   const [lastCreated, setLastCreated] = useState<NewDeviceResponse | null>(null);
   const [lastRotated, setLastRotated] = useState<RotateDeviceTokenResponse | null>(null);
   const [message, setMessage] = useState("");
+  const [qrApartmentId, setQrApartmentId] = useState<string | null>(null);
 
   const load = async () => {
     try {
@@ -134,6 +145,9 @@ export function DevicesPage() {
                 <td>{formatDateTime(device.last_seen)}</td>
                 <td>
                   <div className="row-actions">
+                    <button type="button" onClick={() => setQrApartmentId(device.apartment_id)} title="Show guest QR code">
+                      QR Code
+                    </button>
                     <button type="button" onClick={() => void onRotate(device.id)}>
                       Rotate Token
                     </button>
@@ -147,6 +161,13 @@ export function DevicesPage() {
           </tbody>
         </table>
       </div>
+      {qrApartmentId ? (
+        <QrModal
+          url={guestUrl(qrApartmentId)}
+          apartmentId={qrApartmentId}
+          onClose={() => setQrApartmentId(null)}
+        />
+      ) : null}
     </section>
   );
 }

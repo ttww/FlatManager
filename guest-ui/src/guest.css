@@ -74,6 +74,15 @@ h1 {
   font: inherit;
 }
 
+.apartment-display {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  font: inherit;
+  background: var(--surface);
+  color: inherit;
+}
+
 .guest-form input:focus-visible,
 .language-picker select:focus-visible,
 .cta:focus-visible {
