@@ -110,34 +110,85 @@ If code is wrong/expired/inactive, the user sees a denial message.
 
 FlatManager supports **18 languages** with full interface localization. Guests can select their preferred language from the dropdown at the top of the page.
 
-#### 🇬🇧 English & Western European
+<h4>🇬🇧 English & Western European</h4>
+<p>
+   <strong>English</strong><br>
+   <img src="./screenshots/guest-en.png" alt="Guest UI in English" width="420">
+</p>
+<p>
+   <strong>German</strong><br>
+   <img src="./screenshots/guest-de.png" alt="Guest UI in German" width="420">
+</p>
+<p>
+   <strong>French</strong><br>
+   <img src="./screenshots/guest-fr.png" alt="Guest UI in French" width="420">
+</p>
+<p>
+   <strong>Spanish</strong><br>
+   <img src="./screenshots/guest-es.png" alt="Guest UI in Spanish" width="420">
+</p>
+<p>
+   <strong>Portuguese</strong><br>
+   <img src="./screenshots/guest-pt.png" alt="Guest UI in Portuguese" width="420">
+</p>
+<p>
+   <strong>Esperanto</strong><br>
+   <img src="./screenshots/guest-eo.png" alt="Guest UI in Esperanto" width="420">
+</p>
 
-| Language | Screenshot | Language | Screenshot |
-|----------|-----------|----------|-----------|
-| **English** | ![en](./screenshots/guest-en.png) | **German** | ![de](./screenshots/guest-de.png) |
-| **French** | ![fr](./screenshots/guest-fr.png) | **Spanish** | ![es](./screenshots/guest-es.png) |
-| **Portuguese** | ![pt](./screenshots/guest-pt.png) | **Esperanto** | ![eo](./screenshots/guest-eo.png) |
+<h4>🇪🇺 Eastern European & Mediterranean</h4>
+<p>
+   <strong>Czech</strong><br>
+   <img src="./screenshots/guest-cs.png" alt="Guest UI in Czech" width="420">
+</p>
+<p>
+   <strong>Polish</strong><br>
+   <img src="./screenshots/guest-pl.png" alt="Guest UI in Polish" width="420">
+</p>
+<p>
+   <strong>Hungarian</strong><br>
+   <img src="./screenshots/guest-hu.png" alt="Guest UI in Hungarian" width="420">
+</p>
+<p>
+   <strong>Ukrainian</strong><br>
+   <img src="./screenshots/guest-uk.png" alt="Guest UI in Ukrainian" width="420">
+</p>
+<p>
+   <strong>Russian</strong><br>
+   <img src="./screenshots/guest-ru.png" alt="Guest UI in Russian" width="420">
+</p>
+<p>
+   <strong>Greek</strong><br>
+   <img src="./screenshots/guest-el.png" alt="Guest UI in Greek" width="420">
+</p>
 
-#### 🇪🇺 Eastern European & Mediterranean
+<h4>🌏 Asian Languages</h4>
+<p>
+   <strong>Japanese</strong><br>
+   <img src="./screenshots/guest-ja.png" alt="Guest UI in Japanese" width="420">
+</p>
+<p>
+   <strong>Chinese</strong><br>
+   <img src="./screenshots/guest-zh.png" alt="Guest UI in Chinese" width="420">
+</p>
+<p>
+   <strong>Korean</strong><br>
+   <img src="./screenshots/guest-ko.png" alt="Guest UI in Korean" width="420">
+</p>
+<p>
+   <strong>Hindi</strong><br>
+   <img src="./screenshots/guest-hi.png" alt="Guest UI in Hindi" width="420">
+</p>
 
-| Language | Screenshot | Language | Screenshot |
-|----------|-----------|----------|-----------|
-| **Czech** | ![cs](./screenshots/guest-cs.png) | **Polish** | ![pl](./screenshots/guest-pl.png) |
-| **Hungarian** | ![hu](./screenshots/guest-hu.png) | **Ukrainian** | ![uk](./screenshots/guest-uk.png) |
-| **Russian** | ![ru](./screenshots/guest-ru.png) | **Greek** | ![el](./screenshots/guest-el.png) |
-
-#### 🌏 Asian Languages
-
-| Language | Screenshot | Language | Screenshot |
-|----------|-----------|----------|-----------|
-| **Japanese** | ![ja](./screenshots/guest-ja.png) | **Chinese** | ![zh](./screenshots/guest-zh.png) |
-| **Korean** | ![ko](./screenshots/guest-ko.png) | **Hindi** | ![hi](./screenshots/guest-hi.png) |
-
-#### 🌍 Middle East & South Asia
-
-| Language | Screenshot | Language | Screenshot |
-|----------|-----------|----------|-----------|
-| **Arabic** | ![ar](./screenshots/guest-ar.png) | **Hebrew** | ![he](./screenshots/guest-he.png) |
+<h4>🌍 Middle East</h4>
+<p>
+   <strong>Arabic</strong><br>
+   <img src="./screenshots/guest-ar.png" alt="Guest UI in Arabic" width="420">
+</p>
+<p>
+   <strong>Hebrew</strong><br>
+   <img src="./screenshots/guest-he.png" alt="Guest UI in Hebrew" width="420">
+</p>
 
 ---
 
