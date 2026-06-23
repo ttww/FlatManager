@@ -20,6 +20,10 @@
 
 #include "firmware_config.h"
 
+#if defined(ESP32)
+#include "root_ca.h"
+#endif
+
 namespace
 {
 
@@ -34,6 +38,79 @@ namespace
     bool g_ota_initialized = false;
     bool g_time_synced = false;
     uint8_t g_backoff_index = 0;
+
+#ifndef FM_ALLOW_INSECURE_TLS_AFTER_CA_EXPIRE
+#define FM_ALLOW_INSECURE_TLS_AFTER_CA_EXPIRE 0
+#endif
+
+#ifndef FM_ROOT_CA_WARN_BEFORE_DAYS
+#define FM_ROOT_CA_WARN_BEFORE_DAYS 90
+#endif
+
+#ifndef FM_RELAY_SECOND_PULSE_PAUSE_MS
+#define FM_RELAY_SECOND_PULSE_PAUSE_MS 1000
+#endif
+
+#ifndef FM_SERIAL_ANSI_COLORS
+#define FM_SERIAL_ANSI_COLORS 1
+#endif
+
+#ifndef FM_TLS_CONNECTION_SETTLE_MS
+#define FM_TLS_CONNECTION_SETTLE_MS 250
+#endif
+
+#ifndef FM_DEBUG_HEAP_LOGS
+#define FM_DEBUG_HEAP_LOGS 0
+#endif
+
+#if FM_SERIAL_ANSI_COLORS
+    constexpr const char *kAnsiReset = "\033[0m";
+    constexpr const char *kAnsiBold = "\033[1m";
+    constexpr const char *kAnsiDim = "\033[2m";
+    constexpr const char *kAnsiGreen = "\033[32m";
+    constexpr const char *kAnsiYellow = "\033[33m";
+    constexpr const char *kAnsiBlue = "\033[34m";
+    constexpr const char *kAnsiCyan = "\033[36m";
+    constexpr const char *kAnsiRed = "\033[31m";
+#else
+    constexpr const char *kAnsiReset = "";
+    constexpr const char *kAnsiBold = "";
+    constexpr const char *kAnsiDim = "";
+    constexpr const char *kAnsiGreen = "";
+    constexpr const char *kAnsiYellow = "";
+    constexpr const char *kAnsiBlue = "";
+    constexpr const char *kAnsiCyan = "";
+    constexpr const char *kAnsiRed = "";
+#endif
+
+    void log_section(const char *title)
+    {
+        Serial.printf("\n%s%s== %s ==%s\n", kAnsiBold, kAnsiCyan, title, kAnsiReset);
+    }
+
+    void log_kv(const char *key, const char *value)
+    {
+        Serial.printf("  %s%-22s%s %s\n", kAnsiDim, key, kAnsiReset, value);
+    }
+
+    void log_kv_u32(const char *key, uint32_t value)
+    {
+        Serial.printf("  %s%-22s%s %lu\n", kAnsiDim, key, kAnsiReset, static_cast<unsigned long>(value));
+    }
+
+    void log_kv_bool(const char *key, bool value)
+    {
+        Serial.printf("  %s%-22s%s %s\n", kAnsiDim, key, kAnsiReset, value ? "true" : "false");
+    }
+
+    void log_heap(const char *label)
+    {
+#if defined(ESP32) && FM_DEBUG_HEAP_LOGS
+        Serial.printf("  %s%-22s%s %lu bytes\n", kAnsiDim, label, kAnsiReset, static_cast<unsigned long>(ESP.getFreeHeap()));
+#else
+        (void)label;
+#endif
+    }
 
     void feed_watchdog()
     {
@@ -123,13 +200,13 @@ namespace
         const String ssid = WiFi.SSID();
         const String ip = WiFi.localIP().toString();
         const String gateway = WiFi.gatewayIP().toString();
-        Serial.printf(
-            "Wi-Fi status=%s ssid=%s rssi=%d ip=%s gateway=%s\n",
-            wifi_status_name(WiFi.status()),
-            ssid.c_str(),
-            WiFi.RSSI(),
-            ip.c_str(),
-            gateway.c_str());
+
+        log_section("Wi-Fi connected");
+        log_kv("Status", wifi_status_name(WiFi.status()));
+        log_kv("SSID", ssid.c_str());
+        Serial.printf("  %s%-22s%s %d dBm\n", kAnsiDim, "RSSI", kAnsiReset, WiFi.RSSI());
+        log_kv("IP", ip.c_str());
+        log_kv("Gateway", gateway.c_str());
     }
 
     void service_background()
@@ -154,13 +231,22 @@ namespace
 
     void set_relay_state(bool on)
     {
-        const bool pin_high = cfg::kRelayActiveHigh ? on : !on;
-        digitalWrite(cfg::kRelayPin, pin_high ? HIGH : LOW);
+        const bool relay_pin_high = cfg::kRelayActiveHigh ? on : !on;
+        digitalWrite(cfg::kRelayPin, relay_pin_high ? HIGH : LOW);
+
+        if (cfg::kLedPin != cfg::kRelayPin)
+        {
+            digitalWrite(cfg::kLedPin, on ? HIGH : LOW);
+        }
     }
 
     void init_relay_gpio()
     {
         pinMode(cfg::kRelayPin, OUTPUT);
+        if (cfg::kLedPin != cfg::kRelayPin)
+        {
+            pinMode(cfg::kLedPin, OUTPUT);
+        }
         set_relay_state(false);
     }
 
@@ -185,6 +271,46 @@ namespace
 
     bool has_tls_fingerprint() { return strlen(cfg::kTlsCertFingerprint) > 0; }
 
+#if defined(ESP32)
+    bool root_ca_is_expired()
+    {
+        if (!g_time_synced)
+        {
+            return false;
+        }
+
+        const time_t now = time(nullptr);
+        if (now <= 0)
+        {
+            return false;
+        }
+
+        return now >= kRootCaNotAfterUnix;
+    }
+
+    void log_root_ca_expiry_warning_if_needed()
+    {
+        if (!g_time_synced)
+        {
+            return;
+        }
+
+        const time_t now = time(nullptr);
+        if (now <= 0 || now >= kRootCaNotAfterUnix)
+        {
+            return;
+        }
+
+        constexpr time_t kWarnBeforeSeconds = static_cast<time_t>(FM_ROOT_CA_WARN_BEFORE_DAYS) * 24 * 60 * 60;
+        if (kRootCaNotAfterUnix - now <= kWarnBeforeSeconds)
+        {
+            Serial.printf(
+                "Root CA expires soon: %s. Update include/root_ca.h.\n",
+                kRootCaNotAfterIso8601);
+        }
+    }
+#endif
+
     std::unique_ptr<WiFiClient> make_http_client(const String &url)
     {
         if (url_is_https(url))
@@ -203,8 +329,27 @@ namespace
 #elif defined(ESP32)
             auto client = std::make_unique<WiFiClientSecure>();
             client->setTimeout(cfg::kHttpTimeoutMs / 1000);
-            client->setInsecure();
-            Serial.println("HTTPS certificate validation disabled on ESP32. Use a CA certificate for production.");
+
+            if (root_ca_is_expired())
+            {
+#if FM_ALLOW_INSECURE_TLS_AFTER_CA_EXPIRE
+                client->setInsecure();
+                Serial.printf(
+                    "Root CA expired at %s. Falling back to insecure TLS because FM_ALLOW_INSECURE_TLS_AFTER_CA_EXPIRE=1.\n",
+                    kRootCaNotAfterIso8601);
+#else
+                Serial.printf(
+                    "Root CA expired at %s. Refusing HTTPS connection. Update include/root_ca.h.\n",
+                    kRootCaNotAfterIso8601);
+                return nullptr;
+#endif
+            }
+            else
+            {
+                log_root_ca_expiry_warning_if_needed();
+                client->setCACert(kRootCa);
+            }
+
             return client;
 #endif
         }
@@ -282,8 +427,14 @@ namespace
         WiFi.mode(WIFI_STA);
         set_wifi_hostname(cfg::kDeviceName);
         WiFi.setAutoReconnect(true);
+        log_section("Wi-Fi target");
+        log_kv("SSID", cfg::kWifiSsid);
+        log_kv("Device hostname", cfg::kDeviceName);
+        log_kv("OTA hostname", cfg::kOtaHostname);
+        log_kv("Mode", "station");
+
         WiFi.begin(cfg::kWifiSsid, cfg::kWifiPassword);
-        Serial.printf("Connecting Wi-Fi ssid=%s hostname=%s\n", cfg::kWifiSsid, cfg::kDeviceName);
+        Serial.printf("%sConnecting to Wi-Fi...%s\n", kAnsiBlue, kAnsiReset);
 
         const uint32_t start = millis();
         uint32_t last_log_at = 0;
@@ -312,7 +463,6 @@ namespace
             }
         }
 
-        Serial.println("Wi-Fi connected");
         log_wifi_status();
         initialize_ota_once();
         return true;
@@ -414,51 +564,86 @@ namespace
             return false;
         }
 
-        HTTPClient https;
-        if (!https.begin(*client, target_url))
+        log_heap("Heap before POST");
+
+        int code = -1;
+
         {
-            Serial.printf("Failed to begin command-result request target=%s\n", target_url.c_str());
-            return false;
+            HTTPClient https;
+            if (!https.begin(*client, target_url))
+            {
+                Serial.printf("Command-result begin failed target=%s\n", target_url.c_str());
+                https.end();
+                client.reset();
+                safe_delay_ms(FM_TLS_CONNECTION_SETTLE_MS);
+                return false;
+            }
+
+            https.setTimeout(http_timeout_ms());
+            https.addHeader("Content-Type", "application/json");
+            https.addHeader("Authorization", make_authorization_header());
+
+            StaticJsonDocument<256> payload;
+            payload["command_id"] = command_id;
+            payload["status"] = status_value;
+            payload["message"] = message;
+
+            String body;
+            serializeJson(payload, body);
+            code = https.POST(body);
+            https.end();
         }
 
-        https.setTimeout(http_timeout_ms());
-        https.addHeader("Content-Type", "application/json");
-        https.addHeader("Authorization", make_authorization_header());
+        client.reset();
 
-        StaticJsonDocument<256> payload;
-        payload["command_id"] = command_id;
-        payload["status"] = status_value;
-        payload["message"] = message;
-
-        String body;
-        serializeJson(payload, body);
-        const int code = https.POST(body);
         if (code < 200 || code >= 300)
         {
             Serial.printf("Command-result POST failed: %d\n", code);
-            https.end();
+            log_heap("Heap after POST fail");
+            safe_delay_ms(FM_TLS_CONNECTION_SETTLE_MS);
             return false;
         }
 
-        https.end();
+        log_heap("Heap after POST");
+        safe_delay_ms(FM_TLS_CONNECTION_SETTLE_MS);
         return true;
     }
 
     bool pulse_relay_and_report(int command_id, uint32_t duration_ms)
     {
         const uint32_t safe_duration_ms = clamp_duration_ms(duration_ms);
-        Serial.printf(
-            "Relay pulse command_id=%d duration_ms=%lu\n",
-            command_id,
-            static_cast<unsigned long>(safe_duration_ms));
+        constexpr uint32_t kSecondPulsePauseMs = FM_RELAY_SECOND_PULSE_PAUSE_MS;
 
-        set_relay_state(true);
-        safe_delay_ms(safe_duration_ms);
-        set_relay_state(false);
+        log_section("Relay command");
+        Serial.printf("  %s%-22s%s %d\n", kAnsiDim, "Command ID", kAnsiReset, command_id);
+        log_kv_u32("Pulse duration ms", safe_duration_ms);
+        log_kv_u32("Pause before 2nd ms", kSecondPulsePauseMs);
 
-        String msg = "Relay switched for ";
+        for (uint8_t pulse_index = 1; pulse_index <= 2; ++pulse_index)
+        {
+            Serial.printf(
+                "  %sPulse %u/2%s %sON%s\n",
+                kAnsiYellow,
+                pulse_index,
+                kAnsiReset,
+                kAnsiGreen,
+                kAnsiReset);
+            set_relay_state(true);
+            safe_delay_ms(safe_duration_ms);
+            set_relay_state(false);
+            Serial.printf("  %sPulse %u/2%s OFF\n", kAnsiYellow, pulse_index, kAnsiReset);
+
+            if (pulse_index == 1)
+            {
+                safe_delay_ms(kSecondPulsePauseMs);
+            }
+        }
+
+        String msg = "Relay switched twice for ";
         msg += safe_duration_ms;
-        msg += " ms";
+        msg += " ms with ";
+        msg += kSecondPulsePauseMs;
+        msg += " ms pause";
 
         return post_command_result(command_id, "done", msg);
     }
@@ -509,7 +694,7 @@ namespace
             expires_at);
         if (!pulse_relay_and_report(command_id, requested_duration))
         {
-            post_command_result(command_id, "failed", "Relay execution done but report failed");
+            Serial.println("Command-result report failed after relay execution. Skipping immediate retry to preserve TLS heap.");
         }
 
         return PollResult::kProcessed;
@@ -524,48 +709,68 @@ namespace
             return PollResult::kAuthError;
         }
 
-        HTTPClient https;
-        if (!https.begin(*client, target_url))
-        {
-            Serial.printf("Failed to begin wait-command request target=%s\n", target_url.c_str());
-            return PollResult::kTransientError;
-        }
+        log_heap("Heap before GET");
 
-        https.setTimeout(http_timeout_ms());
-        https.addHeader("Authorization", make_authorization_header());
+        String body;
 
-        const int code = https.GET();
-        const String endpoint = format_connected_endpoint(https);
-        if (code == HTTP_CODE_UNAUTHORIZED || code == HTTP_CODE_FORBIDDEN)
         {
+            HTTPClient https;
+            if (!https.begin(*client, target_url))
+            {
+                Serial.printf("Failed to begin wait-command request target=%s\n", target_url.c_str());
+                https.end();
+                client.reset();
+                safe_delay_ms(FM_TLS_CONNECTION_SETTLE_MS);
+                return PollResult::kTransientError;
+            }
+
+            https.setTimeout(http_timeout_ms());
+            https.addHeader("Authorization", make_authorization_header());
+
+            const int code = https.GET();
+            const String endpoint = format_connected_endpoint(https);
+            if (code == HTTP_CODE_UNAUTHORIZED || code == HTTP_CODE_FORBIDDEN)
+            {
+                Serial.printf(
+                    "Auth error on wait-command: %d target=%s remote=%s\n",
+                    code,
+                    target_url.c_str(),
+                    endpoint.c_str());
+                https.end();
+                client.reset();
+                log_heap("Heap after GET auth");
+                safe_delay_ms(FM_TLS_CONNECTION_SETTLE_MS);
+                return PollResult::kAuthError;
+            }
+
+            if (code != HTTP_CODE_OK)
+            {
+                Serial.printf(
+                    "wait-command HTTP status: %d target=%s remote=%s\n",
+                    code,
+                    target_url.c_str(),
+                    endpoint.c_str());
+                https.end();
+                client.reset();
+                log_heap("Heap after GET fail");
+                safe_delay_ms(FM_TLS_CONNECTION_SETTLE_MS);
+                return PollResult::kTransientError;
+            }
+
+            body = https.getString();
             Serial.printf(
-                "Auth error on wait-command: %d target=%s remote=%s\n",
+                "wait-command HTTP status: %d target=%s remote=%s response_bytes=%u\n",
                 code,
                 target_url.c_str(),
-                endpoint.c_str());
+                endpoint.c_str(),
+                static_cast<unsigned>(body.length()));
             https.end();
-            return PollResult::kAuthError;
         }
 
-        if (code != HTTP_CODE_OK)
-        {
-            Serial.printf(
-                "wait-command HTTP status: %d target=%s remote=%s\n",
-                code,
-                target_url.c_str(),
-                endpoint.c_str());
-            https.end();
-            return PollResult::kTransientError;
-        }
+        client.reset();
+        log_heap("Heap after GET");
+        safe_delay_ms(FM_TLS_CONNECTION_SETTLE_MS);
 
-        const String body = https.getString();
-        Serial.printf(
-            "wait-command HTTP status: %d target=%s remote=%s response_bytes=%u\n",
-            code,
-            target_url.c_str(),
-            endpoint.c_str(),
-            static_cast<unsigned>(body.length()));
-        https.end();
         return process_wait_command_response(body);
     }
 
@@ -573,20 +778,28 @@ namespace
     {
         Serial.println();
 #if defined(ESP8266)
-        Serial.println("FlatManager ESP8266 boot");
+        Serial.printf("%s%sFlatManager ESP8266%s\n", kAnsiBold, kAnsiGreen, kAnsiReset);
 #elif defined(ESP32)
-        Serial.println("FlatManager ESP32 boot");
+        Serial.printf("%s%sFlatManager ESP32%s\n", kAnsiBold, kAnsiGreen, kAnsiReset);
 #endif
-        Serial.printf("Device: %s\n", cfg::kDeviceName);
-        Serial.printf("API base: %s\n", cfg::kApiBaseUrl);
-        Serial.printf("Wi-Fi SSID: %s\n", cfg::kWifiSsid);
-        Serial.printf("Relay pin: %u\n", cfg::kRelayPin);
-        Serial.printf("Relay active high: %s\n", cfg::kRelayActiveHigh ? "true" : "false");
-        Serial.printf("Max relay pulse ms: %lu\n", static_cast<unsigned long>(cfg::kMaxRelayPulseMs));
-        Serial.printf("Poll timeout ms: %lu\n", static_cast<unsigned long>(cfg::kPollTimeoutMs));
-        Serial.printf("HTTP timeout ms: %lu\n", static_cast<unsigned long>(cfg::kHttpTimeoutMs));
-        Serial.printf("OTA hostname: %s\n", cfg::kOtaHostname);
-        Serial.printf("Wi-Fi timeout ms: %lu\n", static_cast<unsigned long>(cfg::kWifiConnectTimeoutMs));
+
+        log_section("Device");
+        log_kv("Name", cfg::kDeviceName);
+        log_kv("API base", cfg::kApiBaseUrl);
+        log_kv("OTA hostname", cfg::kOtaHostname);
+
+        log_section("GPIO");
+        log_kv_u32("Relay pin", cfg::kRelayPin);
+        log_kv_u32("LED pin", cfg::kLedPin);
+        log_kv_bool("Relay active high", cfg::kRelayActiveHigh);
+
+        log_section("Timing");
+        log_kv_u32("Max pulse ms", cfg::kMaxRelayPulseMs);
+        log_kv_u32("Second pulse pause ms", FM_RELAY_SECOND_PULSE_PAUSE_MS);
+        log_kv_u32("Poll timeout ms", cfg::kPollTimeoutMs);
+        log_kv_u32("HTTP timeout ms", cfg::kHttpTimeoutMs);
+        log_kv_u32("Wi-Fi timeout ms", cfg::kWifiConnectTimeoutMs);
+        log_kv_u32("TLS settle ms", FM_TLS_CONNECTION_SETTLE_MS);
     }
 
     void print_reset_info()
@@ -608,9 +821,9 @@ void setup()
     delay(2000);
     Serial.println();
 #if defined(ESP8266)
-    Serial.println("FlatManager ESP8266 starting up...");
+    Serial.printf("%sFlatManager ESP8266 starting up...%s\n", kAnsiGreen, kAnsiReset);
 #elif defined(ESP32)
-    Serial.println("FlatManager ESP32 starting up...");
+    Serial.printf("%sFlatManager ESP32 starting up...%s\n", kAnsiGreen, kAnsiReset);
 #endif
     print_reset_info();
     delay(300);

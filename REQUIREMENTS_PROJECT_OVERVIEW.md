@@ -4,7 +4,7 @@
 
 Build a secure and easy-to-use door access solution for short-term guests.
 
-A guest scans a QR code on-site, opens an HTTPS page, enters a time-limited access code, and requests a door open action. The backend validates the request and sends a short-lived command to an ESP8266 device, which triggers a relay for a short pulse.
+A guest scans a QR code on-site, opens an HTTPS page, enters a time-limited access code, and requests a door open action. The backend validates the request and sends a short-lived command to a supported ESP device, which triggers a relay for a short pulse.
 
 ## High-Level Architecture
 
@@ -15,12 +15,12 @@ Guest Web Page (HTTPS)
   -> code input
 Backend API validates code
   -> creates door command
-ESP8266 keeps HTTPS long-poll connection to server
+ESP device keeps HTTPS long-poll connection to server
   -> receives command
 Relay triggers door opener briefly
 ```
 
-Critical principle: the ESP8266 is never publicly reachable. It only creates outbound HTTPS connections to the server.
+Critical principle: the ESP device is never publicly reachable. It only creates outbound HTTPS connections to the server.
 
 ## Communication Model
 
@@ -53,7 +53,7 @@ Flow:
 ## Module Split
 
 - `api/`: FastAPI backend, data model, validation, command queueing, logging.
-- `esp8266/`: PlatformIO firmware for long polling, relay control, and safe failover behavior.
+- `esp/`: PlatformIO firmware for ESP8266 ESP-01S and ESP32-S2 LOLIN S2 Mini targets, long polling, relay control, TLS validation, OTA, and safe failover behavior.
 - `guest-ui/`: public code-entry pages reached by QR code.
 - `admin-ui/`: SPA for management and observability.
 

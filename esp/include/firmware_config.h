@@ -36,6 +36,10 @@
 #define FM_RELAY_PIN 0
 #endif
 
+#ifndef FM_LED_PIN
+#define FM_LED_PIN FM_RELAY_PIN
+#endif
+
 #ifndef FM_RELAY_ACTIVE_HIGH
 #define FM_RELAY_ACTIVE_HIGH 0
 #endif
@@ -101,6 +105,7 @@ namespace cfg
     static constexpr const char *kCommandResultPath = FM_COMMAND_RESULT_PATH;
 
     static constexpr uint8_t kRelayPin = FM_RELAY_PIN;
+    static constexpr uint8_t kLedPin = FM_LED_PIN;
     static constexpr bool kRelayActiveHigh = FM_RELAY_ACTIVE_HIGH != 0;
     static constexpr uint32_t kMaxRelayPulseMs = FM_MAX_RELAY_PULSE_MS;
 
