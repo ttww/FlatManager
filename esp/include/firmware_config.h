@@ -41,7 +41,7 @@
 #endif
 
 #ifndef FM_RELAY_ACTIVE_HIGH
-#define FM_RELAY_ACTIVE_HIGH 0
+#define FM_RELAY_ACTIVE_HIGH 1
 #endif
 
 #ifndef FM_MAX_RELAY_PULSE_MS

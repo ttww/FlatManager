@@ -14,6 +14,7 @@
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <WiFiClientSecure.h>
+#include <driver/gpio.h>
 #else
 #error "Unsupported platform"
 #endif
@@ -61,6 +62,10 @@ namespace
 
 #ifndef FM_DEBUG_HEAP_LOGS
 #define FM_DEBUG_HEAP_LOGS 0
+#endif
+
+#ifndef FM_RELAY_ENABLE_INTERNAL_PULLDOWN
+#define FM_RELAY_ENABLE_INTERNAL_PULLDOWN 1
 #endif
 
 #if FM_SERIAL_ANSI_COLORS
@@ -242,12 +247,20 @@ namespace
 
     void init_relay_gpio()
     {
+#if defined(ESP32) && FM_RELAY_ENABLE_INTERNAL_PULLDOWN
+        gpio_pulldown_en(static_cast<gpio_num_t>(cfg::kRelayPin));
+        gpio_pullup_dis(static_cast<gpio_num_t>(cfg::kRelayPin));
+#elif defined(ESP8266) && FM_RELAY_ENABLE_INTERNAL_PULLDOWN
+        Serial.println("Internal relay pull-down requested, but ESP8266 has no generic internal GPIO pull-down. Use an external resistor.");
+#endif
+
         pinMode(cfg::kRelayPin, OUTPUT);
+        set_relay_state(false);
+
         if (cfg::kLedPin != cfg::kRelayPin)
         {
             pinMode(cfg::kLedPin, OUTPUT);
         }
-        set_relay_state(false);
     }
 
     String make_authorization_header()
@@ -792,6 +805,7 @@ namespace
         log_kv_u32("Relay pin", cfg::kRelayPin);
         log_kv_u32("LED pin", cfg::kLedPin);
         log_kv_bool("Relay active high", cfg::kRelayActiveHigh);
+        log_kv_bool("Relay pull-down", FM_RELAY_ENABLE_INTERNAL_PULLDOWN != 0);
 
         log_section("Timing");
         log_kv_u32("Max pulse ms", cfg::kMaxRelayPulseMs);
