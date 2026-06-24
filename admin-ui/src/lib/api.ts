@@ -5,6 +5,7 @@ import type {
     AdminDevice,
     ApartmentTimezone,
     CommandSummary,
+  DeviceUpdatePayload,
     DeviceStatus,
     NewDeviceResponse,
     RotateDeviceTokenResponse,
@@ -90,6 +91,13 @@ export const api = {
   rotateDeviceToken(adminToken: string, deviceId: number) {
     return request<RotateDeviceTokenResponse>(`/api/admin/devices/${deviceId}/rotate-token`, adminToken, {
       method: "POST",
+    });
+  },
+
+  updateDevice(adminToken: string, deviceId: number, payload: DeviceUpdatePayload) {
+    return request<AdminDevice>(`/api/admin/devices/${deviceId}`, adminToken, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
     });
   },
 

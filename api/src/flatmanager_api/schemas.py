@@ -47,6 +47,11 @@ class AdminDeviceCreateRequest(BaseModel):
     device_name: str = Field(min_length=1, max_length=100)
 
 
+class AdminDeviceUpdateRequest(BaseModel):
+    apartment_id: str | None = Field(default=None, min_length=1, max_length=100)
+    device_name: str | None = Field(default=None, min_length=1, max_length=100)
+
+
 class AdminDeviceCreateResponse(BaseModel):
     id: int
     apartment_id: str

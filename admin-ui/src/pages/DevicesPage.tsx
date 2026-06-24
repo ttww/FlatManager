@@ -20,6 +20,10 @@ export function DevicesPage() {
   const [devices, setDevices] = useState<AdminDevice[]>([]);
   const [apartmentId, setApartmentId] = useState("");
   const [deviceName, setDeviceName] = useState("");
+  const [editingDeviceId, setEditingDeviceId] = useState<number | null>(null);
+  const [editApartmentId, setEditApartmentId] = useState("");
+  const [editDeviceName, setEditDeviceName] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
   const [lastCreated, setLastCreated] = useState<NewDeviceResponse | null>(null);
   const [lastRotated, setLastRotated] = useState<RotateDeviceTokenResponse | null>(null);
   const [message, setMessage] = useState("");
@@ -80,6 +84,45 @@ export function DevicesPage() {
     }
   };
 
+  const onStartEdit = (device: AdminDevice) => {
+    setEditingDeviceId(device.id);
+    setEditApartmentId(device.apartment_id);
+    setEditDeviceName(device.device_name);
+    setMessage("");
+  };
+
+  const onCancelEdit = () => {
+    setEditingDeviceId(null);
+    setEditApartmentId("");
+    setEditDeviceName("");
+  };
+
+  const onSaveEdit = async (deviceId: number) => {
+    const nextApartmentId = editApartmentId.trim();
+    const nextDeviceName = editDeviceName.trim();
+
+    if (!nextApartmentId || !nextDeviceName) {
+      setMessage("Apartment ID and device name are required.");
+      return;
+    }
+
+    setEditBusy(true);
+    setMessage("");
+    try {
+      await api.updateDevice(getAdminToken(), deviceId, {
+        apartment_id: nextApartmentId,
+        device_name: nextDeviceName,
+      });
+      onCancelEdit();
+      await load();
+      setMessage("Device updated.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Update failed");
+    } finally {
+      setEditBusy(false);
+    }
+  };
+
   return (
     <section className="panel">
       <header className="panel-header">
@@ -137,23 +180,65 @@ export function DevicesPage() {
             {devices.map((device) => (
               <tr key={device.id}>
                 <td>{device.id}</td>
-                <td>{device.apartment_id}</td>
-                <td>{device.device_name}</td>
+                <td>
+                  {editingDeviceId === device.id ? (
+                    <input
+                      value={editApartmentId}
+                      onChange={(event) => setEditApartmentId(event.target.value)}
+                    />
+                  ) : (
+                    device.apartment_id
+                  )}
+                </td>
+                <td>
+                  {editingDeviceId === device.id ? (
+                    <input
+                      value={editDeviceName}
+                      onChange={(event) => setEditDeviceName(event.target.value)}
+                    />
+                  ) : (
+                    device.device_name
+                  )}
+                </td>
                 <td>
                   <span className={`status-pill ${statusClass(device.status)}`}>{device.status}</span>
                 </td>
                 <td>{formatDateTime(device.last_seen, device.apartment_timezone)}</td>
                 <td>
                   <div className="row-actions">
-                    <button type="button" onClick={() => setQrApartmentId(device.apartment_id)} title="Show guest QR code">
-                      QR Code
-                    </button>
-                    <button type="button" onClick={() => void onRotate(device.id)}>
-                      Rotate Token
-                    </button>
-                    <button type="button" className="danger" onClick={() => void onDelete(device.id)}>
-                      Delete
-                    </button>
+                    {editingDeviceId === device.id ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => void onSaveEdit(device.id)}
+                          disabled={editBusy}
+                        >
+                          {editBusy ? "Saving..." : "Save"}
+                        </button>
+                        <button type="button" onClick={onCancelEdit} disabled={editBusy}>
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setQrApartmentId(device.apartment_id)}
+                          title="Show guest QR code"
+                        >
+                          QR Code
+                        </button>
+                        <button type="button" onClick={() => onStartEdit(device)}>
+                          Edit
+                        </button>
+                        <button type="button" onClick={() => void onRotate(device.id)}>
+                          Rotate Token
+                        </button>
+                        <button type="button" className="danger" onClick={() => void onDelete(device.id)}>
+                          Delete
+                        </button>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>

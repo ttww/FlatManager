@@ -320,6 +320,31 @@ def test_admin_can_delete_device(tmp_path: Path) -> None:
     assert list_response.json() == []
 
 
+def test_admin_can_update_device_fields(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+    client = TestClient(app)
+
+    create_response = client.post(
+        "/api/admin/devices",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"apartment_id": "apartment-04", "device_name": "Garage"},
+    )
+    assert create_response.status_code == 200
+    device_id = create_response.json()["id"]
+
+    update_response = client.patch(
+        f"/api/admin/devices/{device_id}",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"apartment_id": "apartment-08", "device_name": "Main Gate"},
+    )
+
+    assert update_response.status_code == 200
+    payload = update_response.json()
+    assert payload["apartment_id"] == "apartment-08"
+    assert payload["device_name"] == "Main Gate"
+    assert payload["apartment_timezone"] == "UTC"
+
+
 def test_admin_can_manage_apartment_timezone(tmp_path: Path) -> None:
     _prepare_test_db(tmp_path)
     client = TestClient(app)

@@ -60,6 +60,11 @@ export type RotateDeviceTokenResponse = {
   updated_at: string;
 };
 
+export type DeviceUpdatePayload = {
+  apartment_id?: string;
+  device_name?: string;
+};
+
 export type AccessCodeForm = {
   apartment_id: string;
   code: string;

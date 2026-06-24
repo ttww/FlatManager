@@ -21,6 +21,7 @@ from .schemas import (
     AdminDeviceCreateRequest,
     AdminDeviceCreateResponse,
     AdminDeviceSummaryResponse,
+    AdminDeviceUpdateRequest,
     AdminManualOpenRequest,
     AdminManualOpenResponse,
     AdminRotateTokenResponse,
@@ -350,6 +351,37 @@ def admin_rotate_device_token(
     session.refresh(device)
 
     return AdminRotateTokenResponse(id=device.id, raw_token=raw_token, updated_at=device.updated_at)
+
+
+@router.patch(
+    "/admin/devices/{device_id}",
+    response_model=AdminDeviceSummaryResponse,
+    dependencies=[Depends(require_admin_token)],
+)
+def admin_update_device(
+    device_id: int,
+    payload: AdminDeviceUpdateRequest,
+    session: Annotated[Session, Depends(get_session)],
+) -> AdminDeviceSummaryResponse:
+    device = session.get(Device, device_id)
+    if device is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+
+    if "apartment_id" in update_data and update_data["apartment_id"] is not None:
+        get_or_create_apartment(session, update_data["apartment_id"])
+
+    for field, value in update_data.items():
+        setattr(device, field, value)
+
+    device.updated_at = utc_now()
+    session.add(device)
+    session.commit()
+    session.refresh(device)
+
+    timezone_map = get_apartment_timezone_map(session, {device.apartment_id})
+    return device_to_summary(device, apartment_timezone_for(device.apartment_id, timezone_map))
 
 
 @router.delete(
