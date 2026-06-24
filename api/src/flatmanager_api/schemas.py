@@ -34,6 +34,7 @@ class CommandResultResponse(BaseModel):
 class DeviceStatusResponse(BaseModel):
     id: int
     apartment_id: str
+    apartment_timezone: str = "UTC"
     device_name: str
     status: str
     last_seen: datetime | None
@@ -57,6 +58,7 @@ class AdminDeviceCreateResponse(BaseModel):
 class AdminDeviceSummaryResponse(BaseModel):
     id: int
     apartment_id: str
+    apartment_timezone: str = "UTC"
     device_name: str
     status: str
     last_seen: datetime | None
@@ -76,6 +78,7 @@ class CommandSummaryResponse(BaseModel):
 
     id: int
     apartment_id: str
+    apartment_timezone: str = "UTC"
     device_id: int
     command: str
     status: str
@@ -91,6 +94,7 @@ class AccessLogSummaryResponse(BaseModel):
 
     id: int
     apartment_id: str
+    apartment_timezone: str = "UTC"
     timestamp: datetime
     ip_address: str
     result: str
@@ -103,6 +107,7 @@ class AdminAccessCodeCreateRequest(BaseModel):
     code: str = Field(min_length=4, max_length=12)
     valid_from: datetime
     valid_until: datetime
+    input_timezone: str | None = Field(default=None, max_length=100)
     max_uses: int = Field(default=20, ge=1, le=10000)
     booking_reference: str | None = Field(default=None, max_length=120)
     guest_name: str | None = Field(default=None, max_length=120)
@@ -111,6 +116,7 @@ class AdminAccessCodeCreateRequest(BaseModel):
 class AdminAccessCodeUpdateRequest(BaseModel):
     valid_from: datetime | None = None
     valid_until: datetime | None = None
+    input_timezone: str | None = Field(default=None, max_length=100)
     max_uses: int | None = Field(default=None, ge=1, le=10000)
     booking_reference: str | None = None
     guest_name: str | None = None
@@ -122,6 +128,7 @@ class AdminAccessCodeSummaryResponse(BaseModel):
 
     id: int
     apartment_id: str
+    apartment_timezone: str = "UTC"
     valid_from: datetime
     valid_until: datetime
     max_uses: int
@@ -144,3 +151,12 @@ class AdminManualOpenResponse(BaseModel):
     command_id: int
     apartment_id: str
     device_id: int
+
+
+class AdminApartmentTimezoneSummaryResponse(BaseModel):
+    apartment_id: str
+    timezone: str
+
+
+class AdminApartmentTimezoneUpdateRequest(BaseModel):
+    timezone: str = Field(min_length=1, max_length=100)

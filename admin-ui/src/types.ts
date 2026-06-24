@@ -1,6 +1,7 @@
 export type DeviceStatus = {
   id: number;
   apartment_id: string;
+  apartment_timezone: string;
   device_name: string;
   status: string;
   last_seen: string | null;
@@ -11,6 +12,7 @@ export type DeviceStatus = {
 export type CommandSummary = {
   id: number;
   apartment_id: string;
+  apartment_timezone: string;
   device_id: number;
   command: string;
   status: string;
@@ -24,6 +26,7 @@ export type CommandSummary = {
 export type AccessLogSummary = {
   id: number;
   apartment_id: string;
+  apartment_timezone: string;
   timestamp: string;
   ip_address: string;
   result: string;
@@ -34,6 +37,7 @@ export type AccessLogSummary = {
 export type AdminDevice = {
   id: number;
   apartment_id: string;
+  apartment_timezone: string;
   device_name: string;
   status: string;
   last_seen: string | null;
@@ -61,6 +65,7 @@ export type AccessCodeForm = {
   code: string;
   valid_from: string;
   valid_until: string;
+  input_timezone?: string;
   max_uses: number;
   booking_reference?: string;
   guest_name?: string;
@@ -69,6 +74,7 @@ export type AccessCodeForm = {
 export type AccessCodeSummary = {
   id: number;
   apartment_id: string;
+  apartment_timezone: string;
   valid_from: string;
   valid_until: string;
   max_uses: number;
@@ -78,4 +84,9 @@ export type AccessCodeSummary = {
   guest_name: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type ApartmentTimezone = {
+  apartment_id: string;
+  timezone: string;
 };

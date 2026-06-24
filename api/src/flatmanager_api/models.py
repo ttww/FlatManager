@@ -9,6 +9,16 @@ def default_command_expiration() -> datetime:
     return datetime.now(UTC) + timedelta(seconds=settings.command_expiration_seconds)
 
 
+class Apartment(SQLModel, table=True):
+    __tablename__ = "apartments"
+
+    id: int | None = Field(default=None, primary_key=True)
+    apartment_id: str = Field(unique=True, index=True, max_length=100)
+    timezone: str = Field(default="UTC", max_length=100)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
 class AccessCode(SQLModel, table=True):
     __tablename__ = "access_codes"
 

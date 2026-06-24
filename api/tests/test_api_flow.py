@@ -318,3 +318,79 @@ def test_admin_can_delete_device(tmp_path: Path) -> None:
     )
     assert list_response.status_code == 200
     assert list_response.json() == []
+
+
+def test_admin_can_manage_apartment_timezone(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+    client = TestClient(app)
+
+    get_response = client.get(
+        "/api/admin/apartments/apartment-05",
+        headers={"X-Admin-Token": settings.admin_token},
+    )
+    assert get_response.status_code == 200
+    assert get_response.json() == {"apartment_id": "apartment-05", "timezone": "UTC"}
+
+    update_response = client.put(
+        "/api/admin/apartments/apartment-05/timezone",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"timezone": "Europe/Berlin"},
+    )
+    assert update_response.status_code == 200
+    assert update_response.json() == {"apartment_id": "apartment-05", "timezone": "Europe/Berlin"}
+
+    list_response = client.get(
+        "/api/admin/apartments?apartment_id=apartment-05",
+        headers={"X-Admin-Token": settings.admin_token},
+    )
+    assert list_response.status_code == 200
+    assert list_response.json() == [{"apartment_id": "apartment-05", "timezone": "Europe/Berlin"}]
+
+
+def test_admin_rejects_invalid_apartment_timezone(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+    client = TestClient(app)
+
+    response = client.put(
+        "/api/admin/apartments/apartment-06/timezone",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"timezone": "Not/A-Real-Timezone"},
+    )
+
+    assert response.status_code == 400
+
+
+def test_admin_create_access_code_converts_naive_input_timezone_to_utc(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+    client = TestClient(app)
+
+    client.put(
+        "/api/admin/apartments/apartment-07/timezone",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"timezone": "Europe/Berlin"},
+    )
+
+    response = client.post(
+        "/api/admin/access-codes",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={
+            "apartment_id": "apartment-07",
+            "code": "123456",
+            "valid_from": "2026-01-15T10:00:00",
+            "valid_until": "2026-01-15T12:00:00",
+            "input_timezone": "Europe/Berlin",
+            "max_uses": 20,
+        },
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["apartment_timezone"] == "Europe/Berlin"
+
+    with Session(get_engine()) as session:
+        access_code = session.exec(
+            select(AccessCode).where(AccessCode.apartment_id == "apartment-07")
+        ).first()
+        assert access_code is not None
+        assert access_code.valid_from.hour == 9
+        assert access_code.valid_until.hour == 11

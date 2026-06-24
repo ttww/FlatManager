@@ -47,9 +47,9 @@ export function CommandsPage() {
                 <td>
                   <span className={`status-pill ${statusClass(row.status)}`}>{row.status}</span>
                 </td>
-                <td>{formatDateTime(row.created_at)}</td>
-                <td>{formatDateTime(row.expires_at)}</td>
-                <td>{formatDateTime(row.acknowledged_at)}</td>
+                <td>{formatDateTime(row.created_at, row.apartment_timezone)}</td>
+                <td>{formatDateTime(row.expires_at, row.apartment_timezone)}</td>
+                <td>{formatDateTime(row.acknowledged_at, row.apartment_timezone)}</td>
               </tr>
             ))}
           </tbody>

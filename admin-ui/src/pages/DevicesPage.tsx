@@ -142,7 +142,7 @@ export function DevicesPage() {
                 <td>
                   <span className={`status-pill ${statusClass(device.status)}`}>{device.status}</span>
                 </td>
-                <td>{formatDateTime(device.last_seen)}</td>
+                <td>{formatDateTime(device.last_seen, device.apartment_timezone)}</td>
                 <td>
                   <div className="row-actions">
                     <button type="button" onClick={() => setQrApartmentId(device.apartment_id)} title="Show guest QR code">

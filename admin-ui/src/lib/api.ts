@@ -3,6 +3,7 @@ import type {
     AccessCodeSummary,
     AccessLogSummary,
     AdminDevice,
+    ApartmentTimezone,
     CommandSummary,
     DeviceStatus,
     NewDeviceResponse,
@@ -40,6 +41,26 @@ async function request<T>(
 }
 
 export const api = {
+  listApartmentTimezones(adminToken: string, apartmentId?: string) {
+    const query = apartmentId ? `?apartment_id=${encodeURIComponent(apartmentId)}` : "";
+    return request<ApartmentTimezone[]>(`/api/admin/apartments${query}`, adminToken);
+  },
+
+  getApartmentTimezone(adminToken: string, apartmentId: string) {
+    return request<ApartmentTimezone>(`/api/admin/apartments/${encodeURIComponent(apartmentId)}`, adminToken);
+  },
+
+  updateApartmentTimezone(adminToken: string, apartmentId: string, timezone: string) {
+    return request<ApartmentTimezone>(
+      `/api/admin/apartments/${encodeURIComponent(apartmentId)}/timezone`,
+      adminToken,
+      {
+        method: "PUT",
+        body: JSON.stringify({ timezone }),
+      },
+    );
+  },
+
   getDeviceStatus(adminToken: string, apartmentId?: string) {
     const query = apartmentId ? `?apartment_id=${encodeURIComponent(apartmentId)}` : "";
     return request<DeviceStatus[]>(`/api/admin/devices/status${query}`, adminToken);

@@ -40,7 +40,7 @@ export function LogsPage() {
           <tbody>
             {rows.map((row) => (
               <tr key={row.id}>
-                <td>{formatDateTime(row.timestamp)}</td>
+                <td>{formatDateTime(row.timestamp, row.apartment_timezone)}</td>
                 <td>{row.apartment_id}</td>
                 <td>
                   <span className={`status-pill ${statusClass(row.result)}`}>{row.result}</span>

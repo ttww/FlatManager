@@ -2,6 +2,7 @@ import time
 from datetime import UTC, datetime
 from secrets import token_urlsafe
 from typing import Annotated
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -9,12 +10,14 @@ from sqlalchemy import func
 from sqlmodel import Session, select
 
 from .db import get_session
-from .models import AccessCode, AccessLog, Device, DoorCommand
+from .models import AccessCode, AccessLog, Apartment, Device, DoorCommand
 from .schemas import (
     AccessLogSummaryResponse,
     AdminAccessCodeCreateRequest,
     AdminAccessCodeSummaryResponse,
     AdminAccessCodeUpdateRequest,
+    AdminApartmentTimezoneSummaryResponse,
+    AdminApartmentTimezoneUpdateRequest,
     AdminDeviceCreateRequest,
     AdminDeviceCreateResponse,
     AdminDeviceSummaryResponse,
@@ -62,10 +65,116 @@ def derive_device_status(last_seen: datetime | None) -> str:
     return "offline"
 
 
-def device_to_summary(device: Device) -> AdminDeviceSummaryResponse:
+def validate_timezone_name(timezone_name: str) -> str:
+    try:
+        ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid timezone '{timezone_name}'. Use IANA timezone names like Europe/Berlin.",
+        ) from error
+
+    return timezone_name
+
+
+def normalize_datetime_to_utc(value: datetime, *, input_timezone: str | None = None) -> datetime:
+    if value.tzinfo is not None:
+        return value.astimezone(UTC)
+
+    timezone_name = input_timezone or "UTC"
+    normalized_timezone = validate_timezone_name(timezone_name)
+    localized = value.replace(tzinfo=ZoneInfo(normalized_timezone))
+    return localized.astimezone(UTC)
+
+
+def get_or_create_apartment(session: Session, apartment_id: str) -> Apartment:
+    apartment = session.exec(
+        select(Apartment).where(Apartment.apartment_id == apartment_id)
+    ).first()
+    if apartment is not None:
+        return apartment
+
+    now = utc_now()
+    apartment = Apartment(
+        apartment_id=apartment_id,
+        timezone="UTC",
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(apartment)
+    session.flush()
+    return apartment
+
+
+def get_apartment_timezone_map(session: Session, apartment_ids: set[str]) -> dict[str, str]:
+    if not apartment_ids:
+        return {}
+
+    apartments = session.exec(
+        select(Apartment).where(Apartment.apartment_id.in_(list(apartment_ids)))
+    ).all()
+    return {apartment.apartment_id: apartment.timezone for apartment in apartments}
+
+
+def apartment_timezone_for(apartment_id: str, timezone_map: dict[str, str]) -> str:
+    return timezone_map.get(apartment_id, "UTC")
+
+
+def command_to_summary(command: DoorCommand, apartment_timezone: str) -> CommandSummaryResponse:
+    return CommandSummaryResponse(
+        id=command.id,
+        apartment_id=command.apartment_id,
+        apartment_timezone=apartment_timezone,
+        device_id=command.device_id,
+        command=command.command,
+        status=command.status,
+        duration_ms=command.duration_ms,
+        created_at=command.created_at,
+        expires_at=command.expires_at,
+        delivered_at=command.delivered_at,
+        acknowledged_at=command.acknowledged_at,
+    )
+
+
+def access_log_to_summary(
+    access_log: AccessLog, apartment_timezone: str
+) -> AccessLogSummaryResponse:
+    return AccessLogSummaryResponse(
+        id=access_log.id,
+        apartment_id=access_log.apartment_id,
+        apartment_timezone=apartment_timezone,
+        timestamp=access_log.timestamp,
+        ip_address=access_log.ip_address,
+        result=access_log.result,
+        reason=access_log.reason,
+        command_id=access_log.command_id,
+    )
+
+
+def access_code_to_summary(
+    access_code: AccessCode, apartment_timezone: str
+) -> AdminAccessCodeSummaryResponse:
+    return AdminAccessCodeSummaryResponse(
+        id=access_code.id,
+        apartment_id=access_code.apartment_id,
+        apartment_timezone=apartment_timezone,
+        valid_from=access_code.valid_from,
+        valid_until=access_code.valid_until,
+        max_uses=access_code.max_uses,
+        used_count=access_code.used_count,
+        active=access_code.active,
+        booking_reference=access_code.booking_reference,
+        guest_name=access_code.guest_name,
+        created_at=access_code.created_at,
+        updated_at=access_code.updated_at,
+    )
+
+
+def device_to_summary(device: Device, apartment_timezone: str) -> AdminDeviceSummaryResponse:
     return AdminDeviceSummaryResponse(
         id=device.id,
         apartment_id=device.apartment_id,
+        apartment_timezone=apartment_timezone,
         device_name=device.device_name,
         status=derive_device_status(device.last_seen),
         last_seen=device.last_seen,
@@ -80,6 +189,68 @@ def require_admin_token(
 ) -> None:
     if not x_admin_token or x_admin_token != settings.admin_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin token")
+
+
+@router.get(
+    "/admin/apartments",
+    response_model=list[AdminApartmentTimezoneSummaryResponse],
+    dependencies=[Depends(require_admin_token)],
+)
+def admin_list_apartments(
+    session: Annotated[Session, Depends(get_session)],
+    apartment_id: str | None = None,
+) -> list[AdminApartmentTimezoneSummaryResponse]:
+    query = select(Apartment).order_by(Apartment.apartment_id.asc())
+    if apartment_id:
+        query = query.where(Apartment.apartment_id == apartment_id)
+
+    return [
+        AdminApartmentTimezoneSummaryResponse(
+            apartment_id=apartment.apartment_id,
+            timezone=apartment.timezone,
+        )
+        for apartment in session.exec(query).all()
+    ]
+
+
+@router.get(
+    "/admin/apartments/{apartment_id}",
+    response_model=AdminApartmentTimezoneSummaryResponse,
+    dependencies=[Depends(require_admin_token)],
+)
+def admin_get_apartment(
+    apartment_id: str,
+    session: Annotated[Session, Depends(get_session)],
+) -> AdminApartmentTimezoneSummaryResponse:
+    apartment = get_or_create_apartment(session, apartment_id)
+    session.commit()
+    return AdminApartmentTimezoneSummaryResponse(
+        apartment_id=apartment.apartment_id,
+        timezone=apartment.timezone,
+    )
+
+
+@router.put(
+    "/admin/apartments/{apartment_id}/timezone",
+    response_model=AdminApartmentTimezoneSummaryResponse,
+    dependencies=[Depends(require_admin_token)],
+)
+def admin_update_apartment_timezone(
+    apartment_id: str,
+    payload: AdminApartmentTimezoneUpdateRequest,
+    session: Annotated[Session, Depends(get_session)],
+) -> AdminApartmentTimezoneSummaryResponse:
+    timezone_name = validate_timezone_name(payload.timezone)
+    apartment = get_or_create_apartment(session, apartment_id)
+    apartment.timezone = timezone_name
+    apartment.updated_at = utc_now()
+    session.add(apartment)
+    session.commit()
+
+    return AdminApartmentTimezoneSummaryResponse(
+        apartment_id=apartment.apartment_id,
+        timezone=apartment.timezone,
+    )
 
 
 def get_current_device(
@@ -110,6 +281,7 @@ def admin_create_device(
     raw_token = token_urlsafe(32)
     token_hash = hash_device_token(raw_token)
     now = utc_now()
+    get_or_create_apartment(session, payload.apartment_id)
 
     device = Device(
         apartment_id=payload.apartment_id,
@@ -144,7 +316,16 @@ def admin_list_devices(
     if apartment_id:
         query = query.where(Device.apartment_id == apartment_id)
 
-    return [device_to_summary(device) for device in session.exec(query).all()]
+    devices = session.exec(query).all()
+    timezone_map = get_apartment_timezone_map(
+        session,
+        {device.apartment_id for device in devices},
+    )
+
+    return [
+        device_to_summary(device, apartment_timezone_for(device.apartment_id, timezone_map))
+        for device in devices
+    ]
 
 
 @router.post(
@@ -521,6 +702,10 @@ def admin_devices_status(
         query = query.where(Device.apartment_id == apartment_id)
 
     devices = session.exec(query).all()
+    timezone_map = get_apartment_timezone_map(
+        session,
+        {device.apartment_id for device in devices},
+    )
     rows: list[DeviceStatusResponse] = []
 
     for device in devices:
@@ -533,6 +718,7 @@ def admin_devices_status(
             DeviceStatusResponse(
                 id=device.id,
                 apartment_id=device.apartment_id,
+                apartment_timezone=apartment_timezone_for(device.apartment_id, timezone_map),
                 device_name=device.device_name,
                 status=derive_device_status(device.last_seen),
                 last_seen=device.last_seen,
@@ -559,7 +745,16 @@ def admin_recent_commands(
     if apartment_id:
         query = query.where(DoorCommand.apartment_id == apartment_id)
 
-    return [CommandSummaryResponse.model_validate(command) for command in session.exec(query).all()]
+    commands = session.exec(query).all()
+    timezone_map = get_apartment_timezone_map(
+        session,
+        {command.apartment_id for command in commands},
+    )
+
+    return [
+        command_to_summary(command, apartment_timezone_for(command.apartment_id, timezone_map))
+        for command in commands
+    ]
 
 
 @router.get(
@@ -577,8 +772,15 @@ def admin_recent_access_logs(
     if apartment_id:
         query = query.where(AccessLog.apartment_id == apartment_id)
 
+    logs = session.exec(query).all()
+    timezone_map = get_apartment_timezone_map(
+        session,
+        {log_row.apartment_id for log_row in logs},
+    )
+
     return [
-        AccessLogSummaryResponse.model_validate(log_row) for log_row in session.exec(query).all()
+        access_log_to_summary(log_row, apartment_timezone_for(log_row.apartment_id, timezone_map))
+        for log_row in logs
     ]
 
 
@@ -592,6 +794,7 @@ def admin_manual_open(
     request: Request,
     session: Annotated[Session, Depends(get_session)],
 ) -> AdminManualOpenResponse:
+    get_or_create_apartment(session, payload.apartment_id)
     device = session.exec(
         select(Device).where(Device.apartment_id == payload.apartment_id).order_by(Device.id.asc())
     ).first()
@@ -645,7 +848,16 @@ def admin_list_access_codes(
     query = select(AccessCode).order_by(AccessCode.valid_until.desc())
     if apartment_id:
         query = query.where(AccessCode.apartment_id == apartment_id)
-    return [AdminAccessCodeSummaryResponse.model_validate(row) for row in session.exec(query).all()]
+    access_codes = session.exec(query).all()
+    timezone_map = get_apartment_timezone_map(
+        session,
+        {row.apartment_id for row in access_codes},
+    )
+
+    return [
+        access_code_to_summary(row, apartment_timezone_for(row.apartment_id, timezone_map))
+        for row in access_codes
+    ]
 
 
 @router.post(
@@ -659,12 +871,14 @@ def admin_create_access_code(
     session: Annotated[Session, Depends(get_session)],
 ) -> AdminAccessCodeSummaryResponse:
     now = utc_now()
+    apartment = get_or_create_apartment(session, payload.apartment_id)
+    input_timezone = payload.input_timezone or apartment.timezone
     code_hash = hash_access_code(payload.apartment_id, payload.code)
     access_code = AccessCode(
         apartment_id=payload.apartment_id,
         code_hash=code_hash,
-        valid_from=payload.valid_from,
-        valid_until=payload.valid_until,
+        valid_from=normalize_datetime_to_utc(payload.valid_from, input_timezone=input_timezone),
+        valid_until=normalize_datetime_to_utc(payload.valid_until, input_timezone=input_timezone),
         max_uses=payload.max_uses,
         booking_reference=payload.booking_reference,
         guest_name=payload.guest_name,
@@ -676,7 +890,7 @@ def admin_create_access_code(
     session.add(access_code)
     session.commit()
     session.refresh(access_code)
-    return AdminAccessCodeSummaryResponse.model_validate(access_code)
+    return access_code_to_summary(access_code, apartment.timezone)
 
 
 @router.patch(
@@ -693,7 +907,23 @@ def admin_update_access_code(
     if access_code is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Access code not found")
 
+    apartment = get_or_create_apartment(session, access_code.apartment_id)
+    input_timezone = payload.input_timezone or apartment.timezone
     update_data = payload.model_dump(exclude_unset=True)
+    update_data.pop("input_timezone", None)
+
+    if "valid_from" in update_data and update_data["valid_from"] is not None:
+        update_data["valid_from"] = normalize_datetime_to_utc(
+            update_data["valid_from"],
+            input_timezone=input_timezone,
+        )
+
+    if "valid_until" in update_data and update_data["valid_until"] is not None:
+        update_data["valid_until"] = normalize_datetime_to_utc(
+            update_data["valid_until"],
+            input_timezone=input_timezone,
+        )
+
     for field, value in update_data.items():
         setattr(access_code, field, value)
     access_code.updated_at = utc_now()
@@ -701,7 +931,7 @@ def admin_update_access_code(
     session.add(access_code)
     session.commit()
     session.refresh(access_code)
-    return AdminAccessCodeSummaryResponse.model_validate(access_code)
+    return access_code_to_summary(access_code, apartment.timezone)
 
 
 @router.post(
@@ -722,7 +952,11 @@ def admin_deactivate_access_code(
     session.add(access_code)
     session.commit()
     session.refresh(access_code)
-    return AdminAccessCodeSummaryResponse.model_validate(access_code)
+    timezone_map = get_apartment_timezone_map(session, {access_code.apartment_id})
+    return access_code_to_summary(
+        access_code,
+        apartment_timezone_for(access_code.apartment_id, timezone_map),
+    )
 
 
 @router.delete(

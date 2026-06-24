@@ -19,6 +19,8 @@ const initialForm: AccessCodeForm = {
 export function CodesPage() {
   const [form, setForm] = useState<AccessCodeForm>(initialForm);
   const [codes, setCodes] = useState<AccessCodeSummary[]>([]);
+  const [apartmentTimezone, setApartmentTimezone] = useState("UTC");
+  const [timezoneBusy, setTimezoneBusy] = useState(false);
   const [result, setResult] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -35,22 +37,72 @@ export function CodesPage() {
     void loadCodes();
   }, []);
 
+  const loadApartmentTimezone = async (apartmentId: string) => {
+    const normalizedApartmentId = apartmentId.trim();
+    if (!normalizedApartmentId) {
+      setApartmentTimezone("UTC");
+      return;
+    }
+
+    try {
+      const apartment = await api.getApartmentTimezone(getAdminToken(), normalizedApartmentId);
+      setApartmentTimezone(apartment.timezone);
+    } catch {
+      setApartmentTimezone("UTC");
+    }
+  };
+
+  const onSaveTimezone = async () => {
+    const normalizedApartmentId = form.apartment_id.trim();
+    const normalizedTimezone = apartmentTimezone.trim();
+    if (!normalizedApartmentId) {
+      setResult("Enter an apartment ID before saving timezone.");
+      return;
+    }
+
+    if (!normalizedTimezone) {
+      setResult("Timezone cannot be empty.");
+      return;
+    }
+
+    setResult("");
+    setTimezoneBusy(true);
+    try {
+      const apartment = await api.updateApartmentTimezone(
+        getAdminToken(),
+        normalizedApartmentId,
+        normalizedTimezone,
+      );
+      setApartmentTimezone(apartment.timezone);
+      setResult(`Timezone for ${apartment.apartment_id} saved as ${apartment.timezone}.`);
+      await loadCodes();
+    } catch (error) {
+      setResult(`Timezone update failed. ${error instanceof Error ? error.message : ""}`);
+    } finally {
+      setTimezoneBusy(false);
+    }
+  };
+
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setResult("");
     setBusy(true);
 
     try {
+      const normalizedApartmentId = form.apartment_id.trim();
+      const normalizedTimezone = apartmentTimezone.trim() || "UTC";
       const payload: AccessCodeForm = {
         ...form,
-        // datetime-local is local time without timezone. Convert to UTC for API consistency.
-        valid_from: new Date(form.valid_from).toISOString(),
-        valid_until: new Date(form.valid_until).toISOString(),
+        apartment_id: normalizedApartmentId,
+        valid_from: form.valid_from,
+        valid_until: form.valid_until,
+        input_timezone: normalizedTimezone,
       };
 
       await api.createAccessCode(getAdminToken(), payload);
       setResult("Access code created successfully.");
       setForm(initialForm);
+      setApartmentTimezone("UTC");
       await loadCodes();
     } catch (error) {
       setResult(`Create failed. ${error instanceof Error ? error.message : ""}`);
@@ -93,9 +145,34 @@ export function CodesPage() {
           Apartment ID
           <input
             value={form.apartment_id}
-            onChange={(event) => setForm((prev) => ({ ...prev, apartment_id: event.target.value }))}
+            onChange={(event) => {
+              const value = event.target.value;
+              setForm((prev) => ({ ...prev, apartment_id: value }));
+            }}
+            onBlur={(event) => {
+              void loadApartmentTimezone(event.target.value);
+            }}
             required
           />
+        </label>
+
+        <label>
+          Apartment Timezone (IANA)
+          <div className="row-actions">
+            <input
+              value={apartmentTimezone}
+              onChange={(event) => setApartmentTimezone(event.target.value)}
+              placeholder="Europe/Berlin"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => void onSaveTimezone()}
+              disabled={timezoneBusy}
+            >
+              {timezoneBusy ? "Saving..." : "Save Timezone"}
+            </button>
+          </div>
         </label>
 
         <label>
@@ -195,8 +272,8 @@ export function CodesPage() {
                   </span>
                 </td>
                 <td>{code.used_count}/{code.max_uses}</td>
-                <td>{formatDateTime(code.valid_from)}</td>
-                <td>{formatDateTime(code.valid_until)}</td>
+                <td>{formatDateTime(code.valid_from, code.apartment_timezone)}</td>
+                <td>{formatDateTime(code.valid_until, code.apartment_timezone)}</td>
                 <td>{code.booking_reference ?? "-"}</td>
                 <td>{code.guest_name ?? "-"}</td>
                 <td>
