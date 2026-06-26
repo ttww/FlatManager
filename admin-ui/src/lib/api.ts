@@ -5,13 +5,20 @@ import type {
     AdminDevice,
     ApartmentTimezone,
     CommandSummary,
-  DeviceUpdatePayload,
     DeviceStatus,
+    DeviceUpdatePayload,
     NewDeviceResponse,
     RotateDeviceTokenResponse,
 } from "../types";
+import { clearAdminToken } from "./session";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
+const BASE_PATH = import.meta.env.VITE_BASE_PATH ?? "/admin/";
+
+function adminLoginPath(): string {
+  const base = BASE_PATH.endsWith("/") ? BASE_PATH.slice(0, -1) : BASE_PATH;
+  return `${base}/login`;
+}
 
 async function request<T>(
   path: string,
@@ -28,6 +35,14 @@ async function request<T>(
     ...options,
     headers,
   });
+
+  if (response.status === 401) {
+    clearAdminToken();
+    if (window.location.pathname !== adminLoginPath()) {
+      window.location.replace(adminLoginPath());
+    }
+    throw new Error("Unauthorized");
+  }
 
   if (!response.ok) {
     const detail = await response.text();
