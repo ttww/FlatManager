@@ -31,7 +31,22 @@ function deriveDefaultGuestBase(): string {
   return normalized;
 }
 
-const GUEST_BASE = import.meta.env.VITE_GUEST_BASE_URL || deriveDefaultGuestBase();
+function resolveGuestBase(): string {
+  const configured = (import.meta.env.VITE_GUEST_BASE_URL as string | undefined)?.trim();
+  const isRemoteHost = !/^localhost$|^127\.0\.0\.1$/.test(window.location.hostname);
+
+  if (configured && !(configured.includes("localhost") || configured.includes("127.0.0.1"))) {
+    return configured;
+  }
+
+  if (configured && !isRemoteHost) {
+    return configured;
+  }
+
+  return deriveDefaultGuestBase();
+}
+
+const GUEST_BASE = resolveGuestBase();
 
 export function guestUrl(apartmentId: string): string {
   const base = GUEST_BASE.replace(/\/$/, "");
