@@ -1,3 +1,5 @@
+import hashlib
+import logging
 import time
 from datetime import UTC, datetime
 from secrets import token_urlsafe
@@ -39,6 +41,7 @@ from .settings import settings
 
 router = APIRouter(prefix="/api")
 device_bearer = HTTPBearer(auto_error=False)
+logger = logging.getLogger(__name__)
 
 NEUTRAL_DENIED_MESSAGE = "Code invalid or not valid."
 SUCCESS_MESSAGE = "Door opening requested."
@@ -183,6 +186,11 @@ def require_admin_token(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin token")
 
 
+def token_fingerprint(token: str) -> str:
+    digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    return digest[:12]
+
+
 @router.get(
     "/admin/apartments",
     response_model=list[AdminApartmentTimezoneSummaryResponse],
@@ -314,14 +322,28 @@ def admin_delete_apartment(
 def get_current_device(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(device_bearer)],
     session: Annotated[Session, Depends(get_session)],
+    request: Request,
 ) -> Device:
     if credentials is None:
+        logger.warning(
+            "Device auth failed: missing bearer token path=%s ip=%s ua=%s",
+            request.url.path,
+            request.client.host if request.client else "unknown",
+            request.headers.get("user-agent", "-"),
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token")
 
     token_hash = hash_device_token(credentials.credentials)
     device = session.exec(select(Device).where(Device.device_token_hash == token_hash)).first()
 
     if device is None:
+        logger.warning(
+            "Device auth failed: invalid bearer token path=%s ip=%s token_fp=%s ua=%s",
+            request.url.path,
+            request.client.host if request.client else "unknown",
+            token_fingerprint(credentials.credentials),
+            request.headers.get("user-agent", "-"),
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid bearer token")
 
     return device
