@@ -1,4 +1,20 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
+function resolveApiBase(): string {
+  const configured = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+  const origin = window.location.origin;
+  const isRemoteHost = !/^localhost$|^127\.0\.0\.1$/.test(window.location.hostname);
+
+  if (!configured) {
+    return origin;
+  }
+
+  if ((configured.includes("localhost") || configured.includes("127.0.0.1")) && isRemoteHost) {
+    return origin;
+  }
+
+  return configured;
+}
+
+const API_BASE = resolveApiBase();
 
 function deriveDefaultGuestBase(): string {
   const normalized = API_BASE.replace(/\/$/, "");
