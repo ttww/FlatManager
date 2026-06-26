@@ -8,13 +8,29 @@ import type { CommandSummary } from "../types";
 export function CommandsPage() {
   const [rows, setRows] = useState<CommandSummary[]>([]);
   const [message, setMessage] = useState("");
+  const [clearing, setClearing] = useState(false);
 
-  useEffect(() => {
+  const load = () =>
     api
       .getRecentCommands(getAdminToken())
       .then(setRows)
       .catch((error) => setMessage(error instanceof Error ? error.message : "Load failed"));
-  }, []);
+
+  useEffect(() => { void load(); }, []);
+
+  const onClearAll = async () => {
+    if (!window.confirm("Delete all command history?")) return;
+    setClearing(true);
+    setMessage("");
+    try {
+      await api.deleteAllCommands(getAdminToken());
+      setRows([]);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Clear failed.");
+    } finally {
+      setClearing(false);
+    }
+  };
 
   return (
     <section className="panel">
@@ -22,6 +38,12 @@ export function CommandsPage() {
         <h2>Command History</h2>
         <p>Recent door command states from pending through acknowledged.</p>
       </header>
+
+      <div className="panel-actions">
+        <button type="button" className="danger" onClick={() => void onClearAll()} disabled={clearing || rows.length === 0}>
+          {clearing ? "Clearing..." : "Clear All"}
+        </button>
+      </div>
 
       {message ? <p className="inline-message">{message}</p> : null}
 

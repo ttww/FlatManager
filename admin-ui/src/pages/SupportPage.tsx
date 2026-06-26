@@ -1,12 +1,21 @@
 import type { FormEvent } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { api } from "../lib/api";
 import { getAdminToken } from "../lib/session";
+import type { ApartmentTimezone } from "../types";
 
 export function SupportPage() {
   const [apartmentId, setApartmentId] = useState("");
+  const [apartmentIds, setApartmentIds] = useState<string[]>([]);
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    api
+      .listApartmentTimezones(getAdminToken())
+      .then((rows: ApartmentTimezone[]) => setApartmentIds(rows.map((r) => r.apartment_id)))
+      .catch(() => setApartmentIds([]));
+  }, []);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -29,12 +38,16 @@ export function SupportPage() {
       </header>
 
       <form className="device-form" onSubmit={onSubmit}>
-        <input
+        <select
           value={apartmentId}
           onChange={(event) => setApartmentId(event.target.value)}
-          placeholder="Apartment ID"
           required
-        />
+        >
+          <option value="">— select apartment —</option>
+          {apartmentIds.map((id) => (
+            <option key={id} value={id}>{id}</option>
+          ))}
+        </select>
         <button type="submit" className="primary-button">
           Trigger Manual Open
         </button>

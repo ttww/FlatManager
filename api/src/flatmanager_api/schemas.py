@@ -163,5 +163,10 @@ class AdminApartmentTimezoneSummaryResponse(BaseModel):
     timezone: str
 
 
+class AdminApartmentCreateRequest(BaseModel):
+    apartment_id: str = Field(min_length=1, max_length=100)
+    timezone: str = Field(default="UTC", min_length=1, max_length=100)
+
+
 class AdminApartmentTimezoneUpdateRequest(BaseModel):
     timezone: str = Field(min_length=1, max_length=100)

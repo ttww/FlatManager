@@ -4,20 +4,13 @@ import { useEffect, useState } from "react";
 import { QrModal } from "../components/QrModal";
 import { api } from "../lib/api";
 import { formatDateTime, statusClass } from "../lib/format";
+import { guestUrl } from "../lib/guestUrl";
 import { getAdminToken } from "../lib/session";
-import type { AdminDevice, NewDeviceResponse, RotateDeviceTokenResponse } from "../types";
-
-const GUEST_BASE = import.meta.env.VITE_API_BASE_URL
-  ? import.meta.env.VITE_API_BASE_URL.replace(/\/api$/, "")
-  : window.location.origin;
-
-function guestUrl(apartmentId: string): string {
-  const base = GUEST_BASE.replace(/\/$/, "");
-  return `${base}/guest/?apartment_id=${encodeURIComponent(apartmentId)}`;
-}
+import type { AdminDevice, ApartmentTimezone, NewDeviceResponse, RotateDeviceTokenResponse } from "../types";
 
 export function DevicesPage() {
   const [devices, setDevices] = useState<AdminDevice[]>([]);
+  const [apartmentIds, setApartmentIds] = useState<string[]>([]);
   const [apartmentId, setApartmentId] = useState("");
   const [deviceName, setDeviceName] = useState("");
   const [editingDeviceId, setEditingDeviceId] = useState<number | null>(null);
@@ -41,6 +34,10 @@ export function DevicesPage() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
+    api
+      .listApartmentTimezones(getAdminToken())
+      .then((rows: ApartmentTimezone[]) => setApartmentIds(rows.map((r) => r.apartment_id)))
+      .catch(() => setApartmentIds([]));
   }, []);
 
   const onCreate = async (event: FormEvent<HTMLFormElement>) => {
@@ -131,12 +128,16 @@ export function DevicesPage() {
       </header>
 
       <form onSubmit={onCreate} className="device-form">
-        <input
+        <select
           value={apartmentId}
           onChange={(event) => setApartmentId(event.target.value)}
-          placeholder="Apartment ID"
           required
-        />
+        >
+          <option value="">— select apartment —</option>
+          {apartmentIds.map((id) => (
+            <option key={id} value={id}>{id}</option>
+          ))}
+        </select>
         <input
           value={deviceName}
           onChange={(event) => setDeviceName(event.target.value)}
@@ -182,10 +183,15 @@ export function DevicesPage() {
                 <td>{device.id}</td>
                 <td>
                   {editingDeviceId === device.id ? (
-                    <input
+                    <select
                       value={editApartmentId}
                       onChange={(event) => setEditApartmentId(event.target.value)}
-                    />
+                    >
+                      <option value="">— select apartment —</option>
+                      {apartmentIds.map((id) => (
+                        <option key={id} value={id}>{id}</option>
+                      ))}
+                    </select>
                   ) : (
                     device.apartment_id
                   )}

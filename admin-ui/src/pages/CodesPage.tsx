@@ -19,8 +19,8 @@ const initialForm: AccessCodeForm = {
 export function CodesPage() {
   const [form, setForm] = useState<AccessCodeForm>(initialForm);
   const [codes, setCodes] = useState<AccessCodeSummary[]>([]);
+  const [apartmentIds, setApartmentIds] = useState<string[]>([]);
   const [apartmentTimezone, setApartmentTimezone] = useState("UTC");
-  const [timezoneBusy, setTimezoneBusy] = useState(false);
   const [result, setResult] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -35,6 +35,14 @@ export function CodesPage() {
 
   useEffect(() => {
     void loadCodes();
+    void (async () => {
+      try {
+        const apartments = await api.listApartmentTimezones(getAdminToken());
+        setApartmentIds(apartments.map((row) => row.apartment_id));
+      } catch {
+        setApartmentIds([]);
+      }
+    })();
   }, []);
 
   const loadApartmentTimezone = async (apartmentId: string) => {
@@ -48,38 +56,7 @@ export function CodesPage() {
       const apartment = await api.getApartmentTimezone(getAdminToken(), normalizedApartmentId);
       setApartmentTimezone(apartment.timezone);
     } catch {
-      setApartmentTimezone("UTC");
-    }
-  };
-
-  const onSaveTimezone = async () => {
-    const normalizedApartmentId = form.apartment_id.trim();
-    const normalizedTimezone = apartmentTimezone.trim();
-    if (!normalizedApartmentId) {
-      setResult("Enter an apartment ID before saving timezone.");
-      return;
-    }
-
-    if (!normalizedTimezone) {
-      setResult("Timezone cannot be empty.");
-      return;
-    }
-
-    setResult("");
-    setTimezoneBusy(true);
-    try {
-      const apartment = await api.updateApartmentTimezone(
-        getAdminToken(),
-        normalizedApartmentId,
-        normalizedTimezone,
-      );
-      setApartmentTimezone(apartment.timezone);
-      setResult(`Timezone for ${apartment.apartment_id} saved as ${apartment.timezone}.`);
-      await loadCodes();
-    } catch (error) {
-      setResult(`Timezone update failed. ${error instanceof Error ? error.message : ""}`);
-    } finally {
-      setTimezoneBusy(false);
+      setApartmentTimezone("Apartment not found");
     }
   };
 
@@ -90,6 +67,10 @@ export function CodesPage() {
 
     try {
       const normalizedApartmentId = form.apartment_id.trim();
+      if (apartmentTimezone === "Apartment not found") {
+        setResult("Apartment not found. Create it on the Apartments page first.");
+        return;
+      }
       const normalizedTimezone = apartmentTimezone.trim() || "UTC";
       const payload: AccessCodeForm = {
         ...form,
@@ -142,37 +123,30 @@ export function CodesPage() {
 
       <form className="grid-form" onSubmit={onSubmit}>
         <label>
-          Apartment ID
-          <input
+          Apartment
+          <select
             value={form.apartment_id}
             onChange={(event) => {
               const value = event.target.value;
               setForm((prev) => ({ ...prev, apartment_id: value }));
-            }}
-            onBlur={(event) => {
-              void loadApartmentTimezone(event.target.value);
+              void loadApartmentTimezone(value);
             }}
             required
-          />
+          >
+            <option value="">— select apartment —</option>
+            {apartmentIds.map((id) => (
+              <option key={id} value={id}>{id}</option>
+            ))}
+          </select>
         </label>
 
         <label>
-          Apartment Timezone (IANA)
-          <div className="row-actions">
-            <input
-              value={apartmentTimezone}
-              onChange={(event) => setApartmentTimezone(event.target.value)}
-              placeholder="Europe/Berlin"
-              required
-            />
-            <button
-              type="button"
-              onClick={() => void onSaveTimezone()}
-              disabled={timezoneBusy}
-            >
-              {timezoneBusy ? "Saving..." : "Save Timezone"}
-            </button>
-          </div>
+          Apartment Timezone
+          <input
+            value={apartmentTimezone}
+            readOnly
+            aria-readonly
+          />
         </label>
 
         <label>

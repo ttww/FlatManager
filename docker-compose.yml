@@ -25,6 +25,7 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+        VITE_GUEST_BASE_URL: ${VITE_GUEST_BASE_URL:-http://localhost:8081}
         VITE_BASE_PATH: ${ADMIN_BASE_PATH:-/admin/}
     image: ${IMAGE_REPO:-flatmanager}/admin-ui:${TAG:-latest}
     ports:

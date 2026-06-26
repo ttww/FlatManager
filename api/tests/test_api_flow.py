@@ -233,6 +233,13 @@ def test_admin_can_create_and_list_device(tmp_path: Path) -> None:
     _prepare_test_db(tmp_path)
     client = TestClient(app)
 
+    apartment_response = client.post(
+        "/api/admin/apartments",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"apartment_id": "apartment-02", "timezone": "UTC"},
+    )
+    assert apartment_response.status_code == 201
+
     create_response = client.post(
         "/api/admin/devices",
         headers={"X-Admin-Token": settings.admin_token},
@@ -263,6 +270,13 @@ def test_admin_can_rotate_token_and_old_token_stops_working(tmp_path: Path) -> N
     settings.long_poll_poll_interval_ms = 10
 
     client = TestClient(app)
+    apartment_response = client.post(
+        "/api/admin/apartments",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"apartment_id": "apartment-03", "timezone": "UTC"},
+    )
+    assert apartment_response.status_code == 201
+
     create_response = client.post(
         "/api/admin/devices",
         headers={"X-Admin-Token": settings.admin_token},
@@ -299,6 +313,13 @@ def test_admin_can_delete_device(tmp_path: Path) -> None:
     _prepare_test_db(tmp_path)
     client = TestClient(app)
 
+    apartment_response = client.post(
+        "/api/admin/apartments",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"apartment_id": "apartment-04", "timezone": "UTC"},
+    )
+    assert apartment_response.status_code == 201
+
     create_response = client.post(
         "/api/admin/devices",
         headers={"X-Admin-Token": settings.admin_token},
@@ -324,6 +345,20 @@ def test_admin_can_update_device_fields(tmp_path: Path) -> None:
     _prepare_test_db(tmp_path)
     client = TestClient(app)
 
+    apartment_a_response = client.post(
+        "/api/admin/apartments",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"apartment_id": "apartment-04", "timezone": "UTC"},
+    )
+    assert apartment_a_response.status_code == 201
+
+    apartment_b_response = client.post(
+        "/api/admin/apartments",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"apartment_id": "apartment-08", "timezone": "UTC"},
+    )
+    assert apartment_b_response.status_code == 201
+
     create_response = client.post(
         "/api/admin/devices",
         headers={"X-Admin-Token": settings.admin_token},
@@ -348,6 +383,13 @@ def test_admin_can_update_device_fields(tmp_path: Path) -> None:
 def test_admin_can_manage_apartment_timezone(tmp_path: Path) -> None:
     _prepare_test_db(tmp_path)
     client = TestClient(app)
+
+    create_response = client.post(
+        "/api/admin/apartments",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"apartment_id": "apartment-05", "timezone": "UTC"},
+    )
+    assert create_response.status_code == 201
 
     get_response = client.get(
         "/api/admin/apartments/apartment-05",
@@ -376,6 +418,13 @@ def test_admin_rejects_invalid_apartment_timezone(tmp_path: Path) -> None:
     _prepare_test_db(tmp_path)
     client = TestClient(app)
 
+    create_response = client.post(
+        "/api/admin/apartments",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"apartment_id": "apartment-06", "timezone": "UTC"},
+    )
+    assert create_response.status_code == 201
+
     response = client.put(
         "/api/admin/apartments/apartment-06/timezone",
         headers={"X-Admin-Token": settings.admin_token},
@@ -385,15 +434,97 @@ def test_admin_rejects_invalid_apartment_timezone(tmp_path: Path) -> None:
     assert response.status_code == 400
 
 
+def test_admin_can_delete_apartment_without_dependencies(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+    client = TestClient(app)
+
+    create_response = client.post(
+        "/api/admin/apartments",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"apartment_id": "apartment-delete-ok", "timezone": "UTC"},
+    )
+    assert create_response.status_code == 201
+
+    delete_response = client.delete(
+        "/api/admin/apartments/apartment-delete-ok",
+        headers={"X-Admin-Token": settings.admin_token},
+    )
+    assert delete_response.status_code == 204
+
+    get_response = client.get(
+        "/api/admin/apartments/apartment-delete-ok",
+        headers={"X-Admin-Token": settings.admin_token},
+    )
+    assert get_response.status_code == 404
+
+
+def test_admin_cannot_delete_apartment_with_device(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+    client = TestClient(app)
+
+    apartment_response = client.post(
+        "/api/admin/apartments",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"apartment_id": "apartment-delete-device", "timezone": "UTC"},
+    )
+    assert apartment_response.status_code == 201
+
+    device_response = client.post(
+        "/api/admin/devices",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"apartment_id": "apartment-delete-device", "device_name": "Lobby"},
+    )
+    assert device_response.status_code == 200
+
+    delete_response = client.delete(
+        "/api/admin/apartments/apartment-delete-device",
+        headers={"X-Admin-Token": settings.admin_token},
+    )
+    assert delete_response.status_code == 409
+
+
+def test_admin_cannot_delete_apartment_with_access_code(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+    client = TestClient(app)
+
+    apartment_response = client.post(
+        "/api/admin/apartments",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"apartment_id": "apartment-delete-code", "timezone": "UTC"},
+    )
+    assert apartment_response.status_code == 201
+
+    code_response = client.post(
+        "/api/admin/access-codes",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={
+            "apartment_id": "apartment-delete-code",
+            "code": "123456",
+            "valid_from": "2026-01-15T10:00:00",
+            "valid_until": "2026-01-15T12:00:00",
+            "input_timezone": "UTC",
+            "max_uses": 20,
+        },
+    )
+    assert code_response.status_code == 201
+
+    delete_response = client.delete(
+        "/api/admin/apartments/apartment-delete-code",
+        headers={"X-Admin-Token": settings.admin_token},
+    )
+    assert delete_response.status_code == 409
+
+
 def test_admin_create_access_code_converts_naive_input_timezone_to_utc(tmp_path: Path) -> None:
     _prepare_test_db(tmp_path)
     client = TestClient(app)
 
-    client.put(
-        "/api/admin/apartments/apartment-07/timezone",
+    apartment_response = client.post(
+        "/api/admin/apartments",
         headers={"X-Admin-Token": settings.admin_token},
-        json={"timezone": "Europe/Berlin"},
+        json={"apartment_id": "apartment-07", "timezone": "Europe/Berlin"},
     )
+    assert apartment_response.status_code == 201
 
     response = client.post(
         "/api/admin/access-codes",
@@ -419,3 +550,35 @@ def test_admin_create_access_code_converts_naive_input_timezone_to_utc(tmp_path:
         assert access_code is not None
         assert access_code.valid_from.hour == 9
         assert access_code.valid_until.hour == 11
+
+
+def test_admin_create_access_code_requires_existing_apartment(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/admin/access-codes",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={
+            "apartment_id": "missing-apartment",
+            "code": "123456",
+            "valid_from": "2026-01-15T10:00:00",
+            "valid_until": "2026-01-15T12:00:00",
+            "input_timezone": "UTC",
+            "max_uses": 20,
+        },
+    )
+
+    assert response.status_code == 404
+
+
+def test_admin_get_missing_apartment_returns_not_found(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+    client = TestClient(app)
+
+    response = client.get(
+        "/api/admin/apartments/missing-apartment",
+        headers={"X-Admin-Token": settings.admin_token},
+    )
+
+    assert response.status_code == 404

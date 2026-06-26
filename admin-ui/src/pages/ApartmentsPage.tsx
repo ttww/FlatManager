@@ -1,7 +1,9 @@
+import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 
 import { QrModal } from "../components/QrModal";
 import { api } from "../lib/api";
+import { guestUrl } from "../lib/guestUrl";
 import { getAdminToken } from "../lib/session";
 import type { AccessCodeSummary, AdminDevice, ApartmentTimezone } from "../types";
 
@@ -12,15 +14,6 @@ type ApartmentSummary = {
   codeCount: number;
   activeCodeCount: number;
 };
-
-const GUEST_BASE = import.meta.env.VITE_API_BASE_URL
-  ? import.meta.env.VITE_API_BASE_URL.replace(/\/api$/, "")
-  : window.location.origin;
-
-function guestUrl(apartmentId: string): string {
-  const base = GUEST_BASE.replace(/\/$/, "");
-  return `${base}/guest/?apartment_id=${encodeURIComponent(apartmentId)}`;
-}
 
 function summarizeApartments(
   apartments: ApartmentTimezone[],
@@ -40,25 +33,19 @@ function summarizeApartments(
   }
 
   for (const device of devices) {
-    const current = byApartment.get(device.apartment_id) ?? {
-      apartmentId: device.apartment_id,
-      timezone: device.apartment_timezone || "UTC",
-      deviceCount: 0,
-      codeCount: 0,
-      activeCodeCount: 0,
-    };
+    const current = byApartment.get(device.apartment_id);
+    if (!current) {
+      continue;
+    }
     current.deviceCount += 1;
     byApartment.set(device.apartment_id, current);
   }
 
   for (const code of codes) {
-    const current = byApartment.get(code.apartment_id) ?? {
-      apartmentId: code.apartment_id,
-      timezone: code.apartment_timezone || "UTC",
-      deviceCount: 0,
-      codeCount: 0,
-      activeCodeCount: 0,
-    };
+    const current = byApartment.get(code.apartment_id);
+    if (!current) {
+      continue;
+    }
     current.codeCount += 1;
     if (code.active) {
       current.activeCodeCount += 1;
@@ -71,9 +58,13 @@ function summarizeApartments(
 
 export function ApartmentsPage() {
   const [apartments, setApartments] = useState<ApartmentSummary[]>([]);
+  const [newApartmentId, setNewApartmentId] = useState("");
+  const [newTimezone, setNewTimezone] = useState("UTC");
+  const [creatingApartment, setCreatingApartment] = useState(false);
   const [editingApartmentId, setEditingApartmentId] = useState<string | null>(null);
   const [editingTimezone, setEditingTimezone] = useState("UTC");
   const [savingTimezone, setSavingTimezone] = useState(false);
+  const [deletingApartmentId, setDeletingApartmentId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [qrApartmentId, setQrApartmentId] = useState<string | null>(null);
 
@@ -137,17 +128,89 @@ export function ApartmentsPage() {
     }
   };
 
+  const onCreateApartment = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const apartmentId = newApartmentId.trim();
+    const timezone = newTimezone.trim();
+
+    if (!apartmentId) {
+      setMessage("Apartment ID is required.");
+      return;
+    }
+
+    if (!timezone) {
+      setMessage("Timezone is required.");
+      return;
+    }
+
+    setCreatingApartment(true);
+    setMessage("");
+    try {
+      await api.createApartment(getAdminToken(), {
+        apartment_id: apartmentId,
+        timezone,
+      });
+      setNewApartmentId("");
+      setNewTimezone("UTC");
+      await load();
+      setMessage(`Apartment ${apartmentId} created.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Apartment creation failed.");
+    } finally {
+      setCreatingApartment(false);
+    }
+  };
+
+  const onDeleteApartment = async (apartmentId: string) => {
+    if (!window.confirm(`Delete apartment ${apartmentId}?`)) {
+      return;
+    }
+
+    setDeletingApartmentId(apartmentId);
+    setMessage("");
+    try {
+      await api.deleteApartment(getAdminToken(), apartmentId);
+      if (editingApartmentId === apartmentId) {
+        onCancelEditTimezone();
+      }
+      await load();
+      setMessage(`Apartment ${apartmentId} deleted.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Apartment delete failed.");
+    } finally {
+      setDeletingApartmentId(null);
+    }
+  };
+
   return (
     <section className="panel">
       <header className="panel-header">
         <h2>Apartments</h2>
-        <p>See each apartment in one place and open the guest QR link directly.</p>
+        <p>Create and edit apartments in one place, then assign devices and access codes to them.</p>
       </header>
+
+      <form className="device-form" onSubmit={onCreateApartment}>
+        <input
+          value={newApartmentId}
+          onChange={(event) => setNewApartmentId(event.target.value)}
+          placeholder="Apartment ID"
+          required
+        />
+        <input
+          value={newTimezone}
+          onChange={(event) => setNewTimezone(event.target.value)}
+          placeholder="Timezone (IANA, e.g. Europe/Berlin)"
+          required
+        />
+        <button type="submit" className="primary-button" disabled={creatingApartment}>
+          {creatingApartment ? "Creating..." : "Create Apartment"}
+        </button>
+      </form>
 
       {message ? <p className="inline-message">{message}</p> : null}
 
       {apartments.length === 0 && !message ? (
-        <p className="inline-message">No apartments found yet. Create a device or access code first.</p>
+        <p className="inline-message">No apartments found yet. Create your first apartment above.</p>
       ) : null}
 
       <div className="table-wrap">
@@ -187,14 +250,14 @@ export function ApartmentsPage() {
                         <button
                           type="button"
                           onClick={() => void onSaveTimezone(apartment.apartmentId)}
-                          disabled={savingTimezone}
+                          disabled={savingTimezone || deletingApartmentId === apartment.apartmentId}
                         >
                           {savingTimezone ? "Saving..." : "Save"}
                         </button>
                         <button
                           type="button"
                           onClick={onCancelEditTimezone}
-                          disabled={savingTimezone}
+                          disabled={savingTimezone || deletingApartmentId === apartment.apartmentId}
                         >
                           Cancel
                         </button>
@@ -205,6 +268,7 @@ export function ApartmentsPage() {
                           type="button"
                           onClick={() => onStartEditTimezone(apartment)}
                           title="Edit apartment timezone"
+                          disabled={deletingApartmentId === apartment.apartmentId}
                         >
                           Edit
                         </button>
@@ -214,8 +278,17 @@ export function ApartmentsPage() {
                       type="button"
                       onClick={() => setQrApartmentId(apartment.apartmentId)}
                       title="Show guest QR code"
+                      disabled={deletingApartmentId === apartment.apartmentId}
                     >
                       QR Code
+                    </button>
+                    <button
+                      type="button"
+                      className="danger"
+                      onClick={() => void onDeleteApartment(apartment.apartmentId)}
+                      disabled={savingTimezone || deletingApartmentId === apartment.apartmentId}
+                    >
+                      {deletingApartmentId === apartment.apartmentId ? "Deleting..." : "Delete"}
                     </button>
                   </div>
                 </td>

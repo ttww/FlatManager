@@ -8,13 +8,29 @@ import type { AccessLogSummary } from "../types";
 export function LogsPage() {
   const [rows, setRows] = useState<AccessLogSummary[]>([]);
   const [message, setMessage] = useState("");
+  const [clearing, setClearing] = useState(false);
 
-  useEffect(() => {
+  const load = () =>
     api
       .getRecentLogs(getAdminToken())
       .then(setRows)
       .catch((error) => setMessage(error instanceof Error ? error.message : "Load failed"));
-  }, []);
+
+  useEffect(() => { void load(); }, []);
+
+  const onClearAll = async () => {
+    if (!window.confirm("Delete all access logs?")) return;
+    setClearing(true);
+    setMessage("");
+    try {
+      await api.deleteAllAccessLogs(getAdminToken());
+      setRows([]);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Clear failed.");
+    } finally {
+      setClearing(false);
+    }
+  };
 
   return (
     <section className="panel">
@@ -22,6 +38,12 @@ export function LogsPage() {
         <h2>Access Logs</h2>
         <p>Auditable access outcomes with timestamp, source IP, and command reference.</p>
       </header>
+
+      <div className="panel-actions">
+        <button type="button" className="danger" onClick={() => void onClearAll()} disabled={clearing || rows.length === 0}>
+          {clearing ? "Clearing..." : "Clear All"}
+        </button>
+      </div>
 
       {message ? <p className="inline-message">{message}</p> : null}
 

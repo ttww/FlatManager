@@ -16,6 +16,7 @@ from .schemas import (
     AdminAccessCodeCreateRequest,
     AdminAccessCodeSummaryResponse,
     AdminAccessCodeUpdateRequest,
+    AdminApartmentCreateRequest,
     AdminApartmentTimezoneSummaryResponse,
     AdminApartmentTimezoneUpdateRequest,
     AdminDeviceCreateRequest,
@@ -88,22 +89,12 @@ def normalize_datetime_to_utc(value: datetime, *, input_timezone: str | None = N
     return localized.astimezone(UTC)
 
 
-def get_or_create_apartment(session: Session, apartment_id: str) -> Apartment:
+def get_apartment_or_404(session: Session, apartment_id: str) -> Apartment:
     apartment = session.exec(
         select(Apartment).where(Apartment.apartment_id == apartment_id)
     ).first()
-    if apartment is not None:
-        return apartment
-
-    now = utc_now()
-    apartment = Apartment(
-        apartment_id=apartment_id,
-        timezone="UTC",
-        created_at=now,
-        updated_at=now,
-    )
-    session.add(apartment)
-    session.flush()
+    if apartment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Apartment not found")
     return apartment
 
 
@@ -223,8 +214,41 @@ def admin_get_apartment(
     apartment_id: str,
     session: Annotated[Session, Depends(get_session)],
 ) -> AdminApartmentTimezoneSummaryResponse:
-    apartment = get_or_create_apartment(session, apartment_id)
+    apartment = get_apartment_or_404(session, apartment_id)
+    return AdminApartmentTimezoneSummaryResponse(
+        apartment_id=apartment.apartment_id,
+        timezone=apartment.timezone,
+    )
+
+
+@router.post(
+    "/admin/apartments",
+    response_model=AdminApartmentTimezoneSummaryResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_admin_token)],
+)
+def admin_create_apartment(
+    payload: AdminApartmentCreateRequest,
+    session: Annotated[Session, Depends(get_session)],
+) -> AdminApartmentTimezoneSummaryResponse:
+    existing = session.exec(
+        select(Apartment).where(Apartment.apartment_id == payload.apartment_id)
+    ).first()
+    if existing is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Apartment already exists")
+
+    timezone_name = validate_timezone_name(payload.timezone)
+    now = utc_now()
+    apartment = Apartment(
+        apartment_id=payload.apartment_id,
+        timezone=timezone_name,
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(apartment)
     session.commit()
+    session.refresh(apartment)
+
     return AdminApartmentTimezoneSummaryResponse(
         apartment_id=apartment.apartment_id,
         timezone=apartment.timezone,
@@ -242,7 +266,7 @@ def admin_update_apartment_timezone(
     session: Annotated[Session, Depends(get_session)],
 ) -> AdminApartmentTimezoneSummaryResponse:
     timezone_name = validate_timezone_name(payload.timezone)
-    apartment = get_or_create_apartment(session, apartment_id)
+    apartment = get_apartment_or_404(session, apartment_id)
     apartment.timezone = timezone_name
     apartment.updated_at = utc_now()
     session.add(apartment)
@@ -252,6 +276,39 @@ def admin_update_apartment_timezone(
         apartment_id=apartment.apartment_id,
         timezone=apartment.timezone,
     )
+
+
+@router.delete(
+    "/admin/apartments/{apartment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin_token)],
+)
+def admin_delete_apartment(
+    apartment_id: str,
+    session: Annotated[Session, Depends(get_session)],
+) -> None:
+    apartment = get_apartment_or_404(session, apartment_id)
+
+    has_devices = session.exec(
+        select(Device.id).where(Device.apartment_id == apartment_id).limit(1)
+    ).first()
+    if has_devices is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot delete apartment with existing devices.",
+        )
+
+    has_access_codes = session.exec(
+        select(AccessCode.id).where(AccessCode.apartment_id == apartment_id).limit(1)
+    ).first()
+    if has_access_codes is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot delete apartment with existing access codes.",
+        )
+
+    session.delete(apartment)
+    session.commit()
 
 
 def get_current_device(
@@ -282,7 +339,7 @@ def admin_create_device(
     raw_token = token_urlsafe(32)
     token_hash = hash_device_token(raw_token)
     now = utc_now()
-    get_or_create_apartment(session, payload.apartment_id)
+    get_apartment_or_404(session, payload.apartment_id)
 
     device = Device(
         apartment_id=payload.apartment_id,
@@ -370,7 +427,7 @@ def admin_update_device(
     update_data = payload.model_dump(exclude_unset=True)
 
     if "apartment_id" in update_data and update_data["apartment_id"] is not None:
-        get_or_create_apartment(session, update_data["apartment_id"])
+        get_apartment_or_404(session, update_data["apartment_id"])
 
     for field, value in update_data.items():
         setattr(device, field, value)
@@ -816,6 +873,32 @@ def admin_recent_access_logs(
     ]
 
 
+@router.delete(
+    "/admin/commands",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin_token)],
+)
+def admin_delete_all_commands(
+    session: Annotated[Session, Depends(get_session)],
+) -> None:
+    for command in session.exec(select(DoorCommand)).all():
+        session.delete(command)
+    session.commit()
+
+
+@router.delete(
+    "/admin/access-logs",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin_token)],
+)
+def admin_delete_all_access_logs(
+    session: Annotated[Session, Depends(get_session)],
+) -> None:
+    for log_row in session.exec(select(AccessLog)).all():
+        session.delete(log_row)
+    session.commit()
+
+
 @router.post(
     "/admin/commands/manual-open",
     response_model=AdminManualOpenResponse,
@@ -826,7 +909,7 @@ def admin_manual_open(
     request: Request,
     session: Annotated[Session, Depends(get_session)],
 ) -> AdminManualOpenResponse:
-    get_or_create_apartment(session, payload.apartment_id)
+    get_apartment_or_404(session, payload.apartment_id)
     device = session.exec(
         select(Device).where(Device.apartment_id == payload.apartment_id).order_by(Device.id.asc())
     ).first()
@@ -903,7 +986,7 @@ def admin_create_access_code(
     session: Annotated[Session, Depends(get_session)],
 ) -> AdminAccessCodeSummaryResponse:
     now = utc_now()
-    apartment = get_or_create_apartment(session, payload.apartment_id)
+    apartment = get_apartment_or_404(session, payload.apartment_id)
     input_timezone = payload.input_timezone or apartment.timezone
     code_hash = hash_access_code(payload.apartment_id, payload.code)
     access_code = AccessCode(
@@ -939,7 +1022,7 @@ def admin_update_access_code(
     if access_code is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Access code not found")
 
-    apartment = get_or_create_apartment(session, access_code.apartment_id)
+    apartment = get_apartment_or_404(session, access_code.apartment_id)
     input_timezone = payload.input_timezone or apartment.timezone
     update_data = payload.model_dump(exclude_unset=True)
     update_data.pop("input_timezone", None)

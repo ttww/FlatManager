@@ -62,6 +62,13 @@ export const api = {
     return request<ApartmentTimezone[]>(`/api/admin/apartments${query}`, adminToken);
   },
 
+  createApartment(adminToken: string, payload: { apartment_id: string; timezone: string }) {
+    return request<ApartmentTimezone>("/api/admin/apartments", adminToken, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
   getApartmentTimezone(adminToken: string, apartmentId: string) {
     return request<ApartmentTimezone>(`/api/admin/apartments/${encodeURIComponent(apartmentId)}`, adminToken);
   },
@@ -75,6 +82,12 @@ export const api = {
         body: JSON.stringify({ timezone }),
       },
     );
+  },
+
+  deleteApartment(adminToken: string, apartmentId: string) {
+    return request<void>(`/api/admin/apartments/${encodeURIComponent(apartmentId)}`, adminToken, {
+      method: "DELETE",
+    });
   },
 
   getDeviceStatus(adminToken: string, apartmentId?: string) {
@@ -158,5 +171,13 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ apartment_id: apartmentId }),
     });
+  },
+
+  deleteAllCommands(adminToken: string) {
+    return request<void>("/api/admin/commands", adminToken, { method: "DELETE" });
+  },
+
+  deleteAllAccessLogs(adminToken: string) {
+    return request<void>("/api/admin/access-logs", adminToken, { method: "DELETE" });
   },
 };
