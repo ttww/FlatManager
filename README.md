@@ -101,7 +101,7 @@ For detailed setup, configuration, troubleshooting, and deployment guides, see:
 │   └── migrations/     # Database migrations (Alembic)
 ├── admin-ui/           # Admin dashboard (React + TypeScript)
 ├── guest-ui/           # Guest code-entry pages (React + TypeScript)
-├── esp8266/            # Device firmware (PlatformIO)
+├── esp/            # Device firmware (PlatformIO)
 ├── docker-compose.yml  # Full stack orchestration
 └── docs/               # User documentation & screenshots
 ```
@@ -163,23 +163,39 @@ See `api/.env.example` for all options.
 
 ---
 
-## Device Setup (ESP8266)
+## Device Setup (ESP8266 or ESP32 in esp/)
 
-Configure `esp8266/include/secrets.h`:
+Currently configured boards in `esp/platformio.ini`:
+
+| Environment | Board | Upload |
+|---|---|---|
+| `esp01_1m` | ESP8266 ESP-01S | USB/serial |
+| `esp01_1m_ota` | ESP8266 ESP-01S | OTA |
+| `lolin_s2_mini` | ESP32-S2 LOLIN S2 Mini | USB/serial |
+| `lolin_s2_mini_ota` | ESP32-S2 LOLIN S2 Mini | OTA |
+
+Configure your secrets in `esp/include/secrets.h`:
 
 ```cpp
 #define FM_DEVICE_NAME "front-door"
-#define FM_WIFI_SSID "YourNetwork"
-#define FM_WIFI_PASSWORD "YourPassword"
+#define FM_WIFI_SSID_1 "YourPrimaryNetwork"
+#define FM_WIFI_PASSWORD_1 "YourPassword"
+#define FM_WIFI_SSID_2 "YourFallbackNetwork"   // optional, leave "" to skip
+#define FM_WIFI_PASSWORD_2 "YourPassword"
+#define FM_WIFI_SSID_3 ""                       // optional, leave "" to skip
+#define FM_WIFI_PASSWORD_3 ""
 #define FM_API_BASE_URL "https://your-domain.com"
 #define FM_DEVICE_TOKEN "token-from-admin-ui"
-#define FM_RELAY_PIN 0  // GPIO for relay module
+#define FM_OTA_PASSWORD "your-ota-password"
 ```
+
+Board-specific parameters (relay GPIO, active level, LED pin) are set in
+`esp/platformio.ini` under `[relay_esp01]` and `[relay_lolin_s2_mini]`.
 
 Then build and upload via PlatformIO:
 
 ```bash
-cd esp8266
+cd esp
 pio run -t upload
 ```
 
