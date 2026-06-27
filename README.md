@@ -95,11 +95,39 @@ Features:
 
 ---
 
+## Built Device Example
+
+FlatManager includes complete hardware design and 3D models for building your own door opener device:
+
+**Circuit Diagram (ESP32 relay configuration):**
+
+<p align="center">
+  <img src="docs/images/circuit_esp32.png" width="500" alt="ESP32 relay wiring diagram for door opener">
+</p>
+
+**Assembled Device (internal view):**
+
+<p align="center">
+  <img src="docs/images/opener_device_inside.jpg" width="500" alt="Interior of assembled door opener device">
+</p>
+
+**3D-Printable Housing:**
+
+
+
+The device enclosure is available as a 3D model:
+- **STL format**: [docs/models/DoorOpener v3.stl](docs/models/DoorOpener%20v3.stl) — Ready for any 3D printer
+- **3MF format**: [docs/models/DoorOpener v3.3mf](docs/models/DoorOpener%20v3.3mf) — With material and color metadata
+
+Designed for compact wall mounting on standard door frames with integrated relay and ESP32 device housing.
+
+---
+
 ## Full Documentation
 
-For detailed setup, configuration, troubleshooting, and deployment guides, see:
+For detailed setup, configuration, troubleshooting, deployment guides, and hardware documentation, see:
 
-📖 **[User Documentation](docs/USER_DOCUMENTATION.md)** — Complete step-by-step guide with screenshots
+📖 **[User Documentation](docs/USER_DOCUMENTATION.md)** — Complete step-by-step guide with screenshots, hardware info, and 3D models
 
 ---
 

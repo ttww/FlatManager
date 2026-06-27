@@ -260,7 +260,36 @@ If guests cannot open the door:
 
 ---
 
-## 4. URL Overview
+## 4. Hardware & Device Documentation
+
+FlatManager includes complete hardware documentation and 3D-printable models for building your own door opener device.
+
+### Circuit Diagram
+
+**ESP32 Relay Configuration:**
+
+<p align="center">
+  <img src="./images/circuit_esp32.png" width="500" alt="ESP32 relay wiring diagram for door opener">
+</p>
+
+### Images
+
+The `docs/images/` folder contains:
+- **circuit_esp32.png** — Wiring diagram for ESP32 relay configuration
+- **opener_device_inside.jpg** — Internal view of a built and assembled device
+- **opener_device_outside.jpg** — External view of a completed 3D-printed enclosure
+
+### 3D Models
+
+The `docs/models/` folder contains the door opener housing in two formats:
+- **DoorOpener v3.stl** — Standard STL format for 3D printing
+- **DoorOpener v3.3mf** — 3MF format with material and color information
+
+Both files represent the same v3 design suitable for compact mounting on standard door frames.
+
+---
+
+## 5. URL Overview
 
 - Admin UI: `http://localhost:8080`
 - Guest UI: `http://localhost:8081`
