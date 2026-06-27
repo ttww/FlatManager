@@ -136,13 +136,13 @@ For detailed setup, configuration, troubleshooting, deployment guides, and hardw
 ```
 .
 ├── api/                 # FastAPI backend (Python)
-│   ├── src/            # Application code
-│   └── migrations/     # Database migrations (Alembic)
-├── admin-ui/           # Admin dashboard (React + TypeScript)
-├── guest-ui/           # Guest code-entry pages (React + TypeScript)
-├── esp/            # Device firmware (PlatformIO)
-├── docker-compose.yml  # Full stack orchestration
-└── docs/               # User documentation & screenshots
+│   ├── src/             # Application code
+│   └── migrations/      # Database migrations (Alembic)
+├── admin-ui/            # Admin dashboard (React + TypeScript)
+├── guest-ui/            # Guest code-entry pages (React + TypeScript)
+├── esp/                 # Device firmware (PlatformIO)
+├── docker-compose.yml   # Full stack orchestration
+└── docs/                # User documentation & screenshots
 ```
 
 ---
