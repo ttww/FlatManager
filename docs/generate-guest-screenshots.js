@@ -2,7 +2,7 @@
  * Generate all FlatManager UI screenshots:
  * - Admin UI (6 pages)
  * - Guest UI flow (3 states)
- * - Guest UI languages (18 languages)
+ * - Guest UI languages (22 languages)
  *
  * Prerequisites:
  * - Reachable deployment at https://experiments.thomaswelsch.de
@@ -40,6 +40,10 @@ const LANGUAGES = [
     "hi",
     "el",
     "he",
+    "hvl",
+    "kli",
+    "la",
+    "nav",
 ];
 const LANGUAGE_NAMES = {
     en: "English",
@@ -60,6 +64,10 @@ const LANGUAGE_NAMES = {
     hi: "हिन्दी",
     el: "Ελληνικά",
     he: "עברית",
+    hvl: "High Valyrian",
+    kli: "Klingon",
+    la: "Latin",
+    nav: "Na'vi",
 };
 async function ensureDirectory() {
     if (!fs.existsSync(screenshotsDir)) {

@@ -2,7 +2,7 @@
  * Generate all FlatManager UI screenshots:
  * - Admin UI (6 pages)
  * - Guest UI flow (3 states)
- * - Guest UI languages (18 languages)
+ * - Guest UI languages (22 languages)
  * 
  * Prerequisites:
  * - Reachable deployment at https://experiments.thomaswelsch.de
@@ -34,10 +34,14 @@ type Locale =
   | "es"
   | "fr"
   | "he"
+  | "hvl"
   | "hi"
   | "hu"
   | "ja"
+  | "kli"
   | "ko"
+  | "la"
+  | "nav"
   | "pl"
   | "pt"
   | "ru"
@@ -63,6 +67,10 @@ const LANGUAGES: Locale[] = [
   "hi",
   "el",
   "he",
+  "hvl",
+  "kli",
+  "la",
+  "nav",
 ];
 
 const LANGUAGE_NAMES: Record<Locale, string> = {
@@ -84,6 +92,10 @@ const LANGUAGE_NAMES: Record<Locale, string> = {
   hi: "हिन्दी",
   el: "Ελληνικά",
   he: "עברית",
+  hvl: "High Valyrian",
+  kli: "Klingon",
+  la: "Latin",
+  nav: "Na'vi",
 };
 
 async function ensureDirectory() {

@@ -28,8 +28,12 @@ function detectInitialLocale(): Locale {
   if (browserLocale.startsWith("ko")) return "ko";
   if (browserLocale.startsWith("ar")) return "ar";
   if (browserLocale.startsWith("he")) return "he";
+  if (browserLocale.startsWith("hvl")) return "hvl";
   if (browserLocale.startsWith("fr")) return "fr";
   if (browserLocale.startsWith("es")) return "es";
+  if (browserLocale.startsWith("kli")) return "kli";
+  if (browserLocale.startsWith("la")) return "la";
+  if (browserLocale.startsWith("nav")) return "nav";
   if (browserLocale.startsWith("pt")) return "pt";
   if (browserLocale.startsWith("pl")) return "pl";
   if (browserLocale.startsWith("hu")) return "hu";

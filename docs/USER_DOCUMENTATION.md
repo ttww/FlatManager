@@ -146,9 +146,9 @@ If code is wrong/expired/inactive, the user sees a denial message.
 
 ---
 
-## 2.5 Multilingual Interface (18 Languages)
+## 2.5 Multilingual Interface (22 Languages)
 
-FlatManager supports **18 languages** with full interface localization. Guests can select their preferred language from the dropdown at the top of the page.
+FlatManager supports **22 languages** with full interface localization. Guests can select their preferred language from the dropdown at the top of the page.
 
 <h4>🇬🇧 English & Western European</h4>
 <p>
@@ -174,6 +174,22 @@ FlatManager supports **18 languages** with full interface localization. Guests c
 <p>
    <strong>Esperanto</strong><br>
    <img src="./screenshots/guest-eo.png" alt="Guest UI in Esperanto" width="420">
+</p>
+<p>
+   <strong>Klingon</strong><br>
+   <img src="./screenshots/guest-kli.png" alt="Guest UI in Klingon" width="420">
+</p>
+<p>
+   <strong>High Valyrian</strong><br>
+   <img src="./screenshots/guest-hvl.png" alt="Guest UI in High Valyrian" width="420">
+</p>
+<p>
+   <strong>Na'vi</strong><br>
+   <img src="./screenshots/guest-nav.png" alt="Guest UI in Na'vi" width="420">
+</p>
+<p>
+   <strong>Latin</strong><br>
+   <img src="./screenshots/guest-la.png" alt="Guest UI in Latin" width="420">
 </p>
 
 <h4>🇪🇺 Eastern European & Mediterranean</h4>
