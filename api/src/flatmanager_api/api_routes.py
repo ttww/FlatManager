@@ -33,6 +33,7 @@ from .schemas import (
     CommandSummaryResponse,
     DeviceStatusResponse,
     GuestOpenRequest,
+    GuestCommandStatusResponse,
     GuestOpenResponse,
     WaitCommandResponse,
 )
@@ -689,7 +690,27 @@ def guest_open(
     )
 
     session.commit()
-    return GuestOpenResponse(status="accepted", message=SUCCESS_MESSAGE)
+    return GuestOpenResponse(status="accepted", message=SUCCESS_MESSAGE, command_id=command.id)
+
+
+@router.get("/guest/command-status/{command_id}", response_model=GuestCommandStatusResponse)
+def guest_command_status(
+    command_id: int,
+    apartment_id: str,
+    session: Annotated[Session, Depends(get_session)],
+) -> GuestCommandStatusResponse:
+    command = session.exec(
+        select(DoorCommand).where(
+            DoorCommand.id == command_id,
+            DoorCommand.apartment_id == apartment_id,
+            DoorCommand.source == "guest",
+        )
+    ).first()
+
+    if command is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Command not found")
+
+    return GuestCommandStatusResponse(status=command.status)
 
 
 @router.get("/device/wait-command", response_model=WaitCommandResponse)

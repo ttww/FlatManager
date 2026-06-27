@@ -11,6 +11,11 @@ class GuestOpenRequest(BaseModel):
 class GuestOpenResponse(BaseModel):
     status: str
     message: str
+    command_id: int | None = None
+
+
+class GuestCommandStatusResponse(BaseModel):
+    status: str
 
 
 class WaitCommandResponse(BaseModel):

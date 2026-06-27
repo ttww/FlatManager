@@ -1,11 +1,21 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { localeMeta, localeOptions, messages, type Locale } from "../i18n/messages";
-import { GuestApiError, requestDoorOpen } from "../lib/api";
+import { fetchGuestCommandStatus, GuestApiError, requestDoorOpen } from "../lib/api";
 import { trackEvent } from "../lib/tracking";
 
-type UiState = "idle" | "loading" | "accepted" | "denied" | "network-error" | "timeout" | "rate-limit";
+type UiState =
+  | "idle"
+  | "loading"
+  | "accepted"
+  | "waiting"
+  | "door-opened"
+  | "device-failed"
+  | "denied"
+  | "network-error"
+  | "timeout"
+  | "rate-limit";
 
 function detectInitialLocale(): Locale {
   const browserLocale = navigator.language.toLowerCase();
@@ -36,6 +46,7 @@ export function GuestOpenPage() {
   const [apartmentId, setApartmentId] = useState(prefilledApartmentId ?? "");
   const [code, setCode] = useState("");
   const [uiState, setUiState] = useState<UiState>("idle");
+  const [commandId, setCommandId] = useState<number | null>(null);
   const [errorText, setErrorText] = useState("");
   const isApartmentLocked = prefilledApartmentId !== null;
 
@@ -45,6 +56,9 @@ export function GuestOpenPage() {
 
   const stateMessage = useMemo(() => {
     if (uiState === "accepted") return t.accepted;
+    if (uiState === "waiting") return t.waiting;
+    if (uiState === "door-opened") return t.doorOpened;
+    if (uiState === "device-failed") return t.deviceFailed;
     if (uiState === "denied") return t.neutralDenied;
     if (uiState === "network-error") return t.networkError;
     if (uiState === "timeout") return t.timeoutError;
@@ -52,8 +66,35 @@ export function GuestOpenPage() {
     return "";
   }, [t, uiState]);
 
+  const stateVisual = useMemo(() => {
+    if (uiState === "accepted" || uiState === "waiting") {
+      return { tone: "progress", icon: "", spinner: true };
+    }
+
+    if (uiState === "door-opened") {
+      return { tone: "ok", icon: "check", spinner: false };
+    }
+
+    if (
+      uiState === "device-failed" ||
+      uiState === "denied" ||
+      uiState === "network-error" ||
+      uiState === "timeout" ||
+      uiState === "rate-limit"
+    ) {
+      return { tone: "warn", icon: "warn", spinner: false };
+    }
+
+    return { tone: "neutral", icon: "", spinner: false };
+  }, [uiState]);
+
   const followUpMessage = useMemo(() => {
-    if (uiState === "network-error" || uiState === "timeout" || uiState === "rate-limit") {
+    if (
+      uiState === "network-error" ||
+      uiState === "timeout" ||
+      uiState === "rate-limit" ||
+      uiState === "device-failed"
+    ) {
       return t.retryHint;
     }
 
@@ -73,6 +114,8 @@ export function GuestOpenPage() {
 
     return true;
   };
+
+  const isSubmitDisabled = uiState === "loading" || uiState === "accepted" || uiState === "waiting";
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -106,7 +149,9 @@ export function GuestOpenPage() {
 
       if (result.status === "accepted") {
         setUiState("accepted");
+        setCommandId(result.command_id ?? null);
       } else {
+        setCommandId(null);
         setUiState("denied");
       }
 
@@ -122,12 +167,72 @@ export function GuestOpenPage() {
       }
 
       setUiState(reason);
+      setCommandId(null);
       trackEvent("guest_submit_failed", {
         apartment_id: apartmentId.trim(),
         reason,
       });
     }
   };
+
+  useEffect(() => {
+    if ((uiState !== "accepted" && uiState !== "waiting") || commandId === null) {
+      return;
+    }
+
+    let cancelled = false;
+    const apartment = apartmentId.trim();
+    const timeoutId = window.setTimeout(() => {
+      if (!cancelled) {
+        setUiState("device-failed");
+        setCommandId(null);
+      }
+    }, 15000);
+
+    const poll = async () => {
+      try {
+        const status = await fetchGuestCommandStatus(commandId, apartment);
+
+        if (cancelled) {
+          return;
+        }
+
+        if (status === "pending") {
+          return;
+        }
+
+        if (status === "delivered") {
+          setUiState("waiting");
+          return;
+        }
+
+        if (status === "done") {
+          setUiState("door-opened");
+          setCommandId(null);
+          return;
+        }
+
+        setUiState("device-failed");
+        setCommandId(null);
+      } catch {
+        if (!cancelled) {
+          setUiState("device-failed");
+          setCommandId(null);
+        }
+      }
+    };
+
+    void poll();
+    const intervalId = window.setInterval(() => {
+      void poll();
+    }, 1500);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+      window.clearInterval(intervalId);
+    };
+  }, [apartmentId, commandId, uiState]);
 
   return (
     <main className="guest-shell" dir={currentLocaleMeta.dir} lang={currentLocaleMeta.lang}>
@@ -179,12 +284,21 @@ export function GuestOpenPage() {
 
           {errorText ? <p className="error-text">{errorText}</p> : null}
 
-          <button type="submit" className="cta" disabled={uiState === "loading"}>
+          <button type="submit" className="cta" disabled={isSubmitDisabled}>
             {uiState === "loading" ? t.submitting : t.submit}
           </button>
         </form>
 
-        {stateMessage ? <p className={`state-message ${uiState}`}>{stateMessage}</p> : null}
+        {stateMessage ? (
+          <div className={`status-panel ${stateVisual.tone} ${uiState}`} role="status" aria-live="polite">
+            <span
+              className={`status-icon ${stateVisual.spinner ? "is-spinner" : ""}`}
+              data-icon={stateVisual.icon}
+              aria-hidden="true"
+            />
+            <p className={`state-message ${uiState}`}>{stateMessage}</p>
+          </div>
+        ) : null}
 
         {isOffline ? <p className="hint warning">{t.offlineHint}</p> : null}
         {followUpMessage ? <p className="hint">{followUpMessage}</p> : null}

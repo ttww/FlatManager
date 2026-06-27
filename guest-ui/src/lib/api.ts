@@ -6,7 +6,10 @@ export type GuestOpenPayload = {
 export type GuestOpenResult = {
   status: "accepted" | "denied";
   message: string;
+  command_id?: number | null;
 };
+
+export type GuestCommandStatus = "pending" | "delivered" | "done" | "failed" | "expired";
 
 export class GuestApiError extends Error {
   public readonly kind: "rate-limit" | "timeout" | "network" | "server";
@@ -72,4 +75,41 @@ export async function requestDoorOpen(payload: GuestOpenPayload): Promise<GuestO
   }
 
   return body;
+}
+
+export async function fetchGuestCommandStatus(commandId: number, apartmentId: string): Promise<GuestCommandStatus> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 8000);
+
+  let response: Response;
+  try {
+    const url = new URL(`${API_BASE}/api/guest/command-status/${commandId}`);
+    url.searchParams.set("apartment_id", apartmentId);
+
+    response = await fetch(url.toString(), {
+      method: "GET",
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new GuestApiError("timeout", "Request timed out");
+    }
+    throw new GuestApiError("network", "Network request failed");
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!response.ok) {
+    if (response.status === 429) {
+      throw new GuestApiError("rate-limit", "Too many attempts");
+    }
+    throw new GuestApiError("server", `Request failed (${response.status})`);
+  }
+
+  const body = (await response.json()) as { status: string };
+  if (!body || !["pending", "delivered", "done", "failed", "expired"].includes(body.status)) {
+    throw new GuestApiError("server", "Unexpected response");
+  }
+
+  return body.status as GuestCommandStatus;
 }

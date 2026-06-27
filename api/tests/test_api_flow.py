@@ -69,6 +69,7 @@ def test_guest_open_success_creates_pending_command_and_logs(tmp_path: Path) -> 
 
     assert response.status_code == 200
     assert response.json()["status"] == "accepted"
+    assert isinstance(response.json()["command_id"], int)
 
     with Session(get_engine()) as session:
         command = session.exec(select(DoorCommand)).first()
@@ -77,6 +78,57 @@ def test_guest_open_success_creates_pending_command_and_logs(tmp_path: Path) -> 
 
         logs = session.exec(select(AccessLog)).all()
         assert any(row.result == "success" for row in logs)
+
+
+def test_guest_can_read_own_command_status(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+
+    with Session(get_engine()) as session:
+        _seed_access_code(session, apartment_id="apartment-01", code="123456")
+        device = _seed_device(session, apartment_id="apartment-01", token="device-token-1")
+        command = DoorCommand(
+            device_id=device.id,
+            apartment_id="apartment-01",
+            command="open",
+            duration_ms=1500,
+            status="delivered",
+            expires_at=_iso_now(60),
+            source="guest",
+        )
+        session.add(command)
+        session.commit()
+        session.refresh(command)
+
+    client = TestClient(app)
+    response = client.get(f"/api/guest/command-status/{command.id}", params={"apartment_id": "apartment-01"})
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "delivered"}
+
+
+def test_guest_command_status_requires_matching_apartment(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+
+    with Session(get_engine()) as session:
+        _seed_access_code(session, apartment_id="apartment-01", code="123456")
+        device = _seed_device(session, apartment_id="apartment-01", token="device-token-1")
+        command = DoorCommand(
+            device_id=device.id,
+            apartment_id="apartment-01",
+            command="open",
+            duration_ms=1500,
+            status="pending",
+            expires_at=_iso_now(60),
+            source="guest",
+        )
+        session.add(command)
+        session.commit()
+        session.refresh(command)
+
+    client = TestClient(app)
+    response = client.get(f"/api/guest/command-status/{command.id}", params={"apartment_id": "apartment-99"})
+
+    assert response.status_code == 404
 
 
 def test_guest_open_denied_invalid_code_is_neutral(tmp_path: Path) -> None:

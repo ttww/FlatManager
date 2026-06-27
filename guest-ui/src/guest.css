@@ -108,9 +108,73 @@ h1 {
 }
 
 .state-message {
-  margin: 14px 0 0;
+  margin: 0;
   font-weight: 700;
   color: var(--ok);
+}
+
+.status-panel {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+}
+
+.status-panel.progress {
+  border-color: color-mix(in oklab, var(--brand), #ffffff 45%);
+}
+
+.status-panel.ok {
+  border-color: color-mix(in oklab, var(--ok), #ffffff 50%);
+}
+
+.status-panel.warn {
+  border-color: color-mix(in oklab, var(--warn), #ffffff 45%);
+}
+
+.status-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 18px;
+}
+
+.status-icon.is-spinner {
+  border: 2px solid color-mix(in oklab, var(--brand), #ffffff 72%);
+  border-top-color: var(--brand);
+  animation: guest-spin 0.95s linear infinite;
+}
+
+.status-icon[data-icon="check"] {
+  background: color-mix(in oklab, var(--ok), #ffffff 85%);
+}
+
+.status-icon[data-icon="check"]::before {
+  content: "";
+  width: 8px;
+  height: 5px;
+  border-left: 2px solid var(--ok);
+  border-bottom: 2px solid var(--ok);
+  transform: rotate(-45deg) translateY(-1px);
+}
+
+.status-icon[data-icon="warn"] {
+  background: color-mix(in oklab, var(--warn), #ffffff 86%);
+}
+
+.status-icon[data-icon="warn"]::before {
+  content: "!";
+  color: var(--warn);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .state-message.denied,
@@ -121,6 +185,12 @@ h1 {
 
 .state-message.rate-limit {
   color: var(--warn);
+}
+
+@keyframes guest-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .error-text {
