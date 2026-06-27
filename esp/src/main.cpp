@@ -39,6 +39,7 @@ namespace
     bool g_ota_initialized = false;
     bool g_time_synced = false;
     uint8_t g_backoff_index = 0;
+    uint8_t g_wifi_index = 0;
 
 #ifndef FM_ALLOW_INSECURE_TLS_AFTER_CA_EXPIRE
 #define FM_ALLOW_INSECURE_TLS_AFTER_CA_EXPIRE 0
@@ -440,13 +441,29 @@ namespace
         WiFi.mode(WIFI_STA);
         set_wifi_hostname(cfg::kDeviceName);
         WiFi.setAutoReconnect(true);
+
+        // Skip unconfigured (empty SSID) network slots.
+        {
+            const uint8_t start_index = g_wifi_index;
+            while (strlen(cfg::kWifiNetworks[g_wifi_index].ssid) == 0)
+            {
+                g_wifi_index = (g_wifi_index + 1) % cfg::kWifiNetworkCount;
+                if (g_wifi_index == start_index)
+                {
+                    Serial.println("No configured Wi-Fi networks found.");
+                    return false;
+                }
+            }
+        }
+
+        const cfg::WifiNetwork &net = cfg::kWifiNetworks[g_wifi_index];
         log_section("Wi-Fi target");
-        log_kv("SSID", cfg::kWifiSsid);
+        Serial.printf("  %s%-22s%s %u/%u: %s\n", kAnsiDim, "Network", kAnsiReset,
+                      g_wifi_index + 1, (unsigned)cfg::kWifiNetworkCount, net.ssid);
         log_kv("Device hostname", cfg::kDeviceName);
-        log_kv("OTA hostname", cfg::kOtaHostname);
         log_kv("Mode", "station");
 
-        WiFi.begin(cfg::kWifiSsid, cfg::kWifiPassword);
+        WiFi.begin(net.ssid, net.password);
         Serial.printf("%sConnecting to Wi-Fi...%s\n", kAnsiBlue, kAnsiReset);
 
         const uint32_t start = millis();
@@ -468,10 +485,14 @@ namespace
 
             if (elapsed > cfg::kWifiConnectTimeoutMs)
             {
+                WiFi.disconnect(false);
+                g_wifi_index = (g_wifi_index + 1) % cfg::kWifiNetworkCount;
                 Serial.printf(
-                    "Wi-Fi connect timeout after %lu ms (status=%s)\n",
+                    "Wi-Fi connect timeout after %lu ms (status=%s), trying network %u/%u\n",
                     static_cast<unsigned long>(elapsed),
-                    wifi_status_name(WiFi.status()));
+                    wifi_status_name(WiFi.status()),
+                    g_wifi_index + 1,
+                    (unsigned)cfg::kWifiNetworkCount);
                 return false;
             }
         }
@@ -799,7 +820,14 @@ namespace
         log_section("Device");
         log_kv("Name", cfg::kDeviceName);
         log_kv("API base", cfg::kApiBaseUrl);
-        log_kv("OTA hostname", cfg::kOtaHostname);
+
+        log_section("Wi-Fi networks");
+        for (uint8_t i = 0; i < cfg::kWifiNetworkCount; ++i)
+        {
+            const char *ssid = cfg::kWifiNetworks[i].ssid;
+            Serial.printf("  %s%-22s%s %u: %s\n", kAnsiDim, "Network", kAnsiReset,
+                          i + 1, strlen(ssid) > 0 ? ssid : "(not configured)");
+        }
 
         log_section("GPIO");
         log_kv_u32("Relay pin", cfg::kRelayPin);

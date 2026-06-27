@@ -24,7 +24,6 @@ export function SupportPage() {
     try {
       await api.manualOpen(getAdminToken(), apartmentId);
       setMessage("Manual open command submitted.");
-      setApartmentId("");
     } catch (error) {
       setMessage(`Manual open failed. ${error instanceof Error ? error.message : ""}`);
     }

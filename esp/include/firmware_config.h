@@ -8,12 +8,26 @@
 #error "FM_DEVICE_NAME is not defined. Define it in secret.h"
 #endif
 
-#ifndef FM_WIFI_SSID
-#error "FM_WIFI_SSID is not defined. Define it in secret.h"
+#ifndef FM_WIFI_SSID_1
+#error "FM_WIFI_SSID_1 is not defined. Define it in secrets.h"
 #endif
 
-#ifndef FM_WIFI_PASSWORD
-#error "FM_WIFI_PASSWORD is not defined. Define it in secret.h"
+#ifndef FM_WIFI_PASSWORD_1
+#error "FM_WIFI_PASSWORD_1 is not defined. Define it in secrets.h"
+#endif
+
+#ifndef FM_WIFI_SSID_2
+#define FM_WIFI_SSID_2 ""
+#endif
+#ifndef FM_WIFI_PASSWORD_2
+#define FM_WIFI_PASSWORD_2 ""
+#endif
+
+#ifndef FM_WIFI_SSID_3
+#define FM_WIFI_SSID_3 ""
+#endif
+#ifndef FM_WIFI_PASSWORD_3
+#define FM_WIFI_PASSWORD_3 ""
 #endif
 
 #ifndef FM_API_BASE_URL
@@ -73,7 +87,7 @@
 #endif
 
 #ifndef FM_OTA_HOSTNAME
-#error "FM_OTA_HOSTNAME is not defined. Define it in secret.h"
+#define FM_OTA_HOSTNAME FM_DEVICE_NAME
 #endif
 
 #ifndef FM_OTA_PASSWORD
@@ -96,9 +110,20 @@ namespace cfg
 {
 
     static constexpr const char *kDeviceName = FM_DEVICE_NAME;
-    static constexpr const char *kWifiSsid = FM_WIFI_SSID;
-    static constexpr const char *kWifiPassword = FM_WIFI_PASSWORD;
     static constexpr const char *kApiBaseUrl = FM_API_BASE_URL;
+
+    struct WifiNetwork
+    {
+        const char *ssid;
+        const char *password;
+    };
+
+    static constexpr WifiNetwork kWifiNetworks[] = {
+        {FM_WIFI_SSID_1, FM_WIFI_PASSWORD_1},
+        {FM_WIFI_SSID_2, FM_WIFI_PASSWORD_2},
+        {FM_WIFI_SSID_3, FM_WIFI_PASSWORD_3},
+    };
+    static constexpr uint8_t kWifiNetworkCount = 3;
     static constexpr const char *kDeviceToken = FM_DEVICE_TOKEN;
 
     static constexpr const char *kWaitCommandPath = FM_WAIT_COMMAND_PATH;

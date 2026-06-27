@@ -46,8 +46,9 @@ ESP_OTA_PASSWORD=YOUR_OTA_PASSWORD ESP_HOST_IP=$(ipconfig getifaddr en0) pio run
 
 ## Configuration constants
 Set values in `platformio.ini` `build_flags`:
-- `FM_WIFI_SSID`
-- `FM_WIFI_PASSWORD`
+- `FM_WIFI_SSID_1`, `FM_WIFI_PASSWORD_1` — primary network (required)
+- `FM_WIFI_SSID_2`, `FM_WIFI_PASSWORD_2` — fallback network (optional, leave empty to skip)
+- `FM_WIFI_SSID_3`, `FM_WIFI_PASSWORD_3` — fallback network (optional, leave empty to skip)
 - `FM_API_BASE_URL`
 - `FM_DEVICE_TOKEN`
 - `FM_TLS_CERT_FINGERPRINT`
@@ -59,7 +60,6 @@ Set values in `platformio.ini` `build_flags`:
 - `FM_WIFI_CONNECT_TIMEOUT_MS`
 - `FM_RECONNECT_JITTER_MIN_MS`
 - `FM_RECONNECT_JITTER_MAX_MS`
-- `FM_OTA_HOSTNAME`
 - `FM_OTA_PASSWORD`
 - `FM_NTP_SERVER_1`
 - `FM_NTP_SERVER_2`
@@ -293,8 +293,9 @@ Default production behavior must remain:
 
 Set values in `platformio.ini` `build_flags` or board-specific sections:
 
-- `FM_WIFI_SSID`
-- `FM_WIFI_PASSWORD`
+- `FM_WIFI_SSID_1`, `FM_WIFI_PASSWORD_1` — primary network (required)
+- `FM_WIFI_SSID_2`, `FM_WIFI_PASSWORD_2` — fallback network (optional, leave empty to skip)
+- `FM_WIFI_SSID_3`, `FM_WIFI_PASSWORD_3` — fallback network (optional, leave empty to skip)
 - `FM_API_BASE_URL`
 - `FM_DEVICE_TOKEN`
 - `FM_TLS_CERT_FINGERPRINT` (ESP8266)
@@ -307,7 +308,6 @@ Set values in `platformio.ini` `build_flags` or board-specific sections:
 - `FM_WIFI_CONNECT_TIMEOUT_MS`
 - `FM_RECONNECT_JITTER_MIN_MS`
 - `FM_RECONNECT_JITTER_MAX_MS`
-- `FM_OTA_HOSTNAME`
 - `FM_OTA_PASSWORD`
 - `FM_NTP_SERVER_1`
 - `FM_NTP_SERVER_2`
@@ -324,3 +324,11 @@ Set values in `platformio.ini` `build_flags` or board-specific sections:
 - ESP8266 TLS certificate fingerprint must match the backend certificate, otherwise requests are rejected.
 - ESP32-S2 Root CA must validate the backend certificate chain, otherwise requests are rejected.
 - ESP-01 1M is configured with `eagle.flash.1m64.ld` so OTA has enough room. If layout is changed to larger FS variants, OTA may fail with `OTA error: 1` (begin error).
+
+# Scratch
+```ini
+pio run -e lolin_s2_mini  -t upload  --upload-port /dev/cu.usbmodem01
+```
+```ini
+pio device monitor -e lolin_s2_mini --filter direct --port /dev/cu.usbmodem01
+```
