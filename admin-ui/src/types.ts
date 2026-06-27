@@ -32,6 +32,7 @@ export type AccessLogSummary = {
   result: string;
   reason: string | null;
   command_id: number | null;
+  access_code_id: number | null;
 };
 
 export type AdminDevice = {

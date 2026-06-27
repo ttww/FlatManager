@@ -110,6 +110,7 @@ class AccessLogSummaryResponse(BaseModel):
     result: str
     reason: str | None
     command_id: int | None
+    access_code_id: int | None
 
 
 class AdminAccessCodeCreateRequest(BaseModel):

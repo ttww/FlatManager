@@ -57,6 +57,7 @@ export function LogsPage() {
               <th>Reason</th>
               <th>IP</th>
               <th>Command</th>
+              <th>Access Code</th>
             </tr>
           </thead>
           <tbody>
@@ -70,6 +71,7 @@ export function LogsPage() {
                 <td>{row.reason ?? "-"}</td>
                 <td>{row.ip_address}</td>
                 <td>{row.command_id ?? "-"}</td>
+                <td>{row.access_code_id ?? "-"}</td>
               </tr>
             ))}
           </tbody>

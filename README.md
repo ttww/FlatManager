@@ -3,6 +3,8 @@
 **Secure, QR-based guest access for smart doors**
 
 FlatManager is a complete door access solution for short-term guests. Guests scan a QR code, enter a time-limited access code, and instantly open the door via a secure HTTPS connection to an ESP8266 or ESP32 device connected to a relay that triggers the door opener contact.
+Check the [full documentation](docs/USER_DOCUMENTATION.md).
+
 
 ## Key Features
 
@@ -251,8 +253,7 @@ pio run -t upload
 
 ## License
 
-[Specify your license here, e.g., MIT, GPL, etc.]
-
+FlatManager is licensed under the Apache License, Version 2.0.
+See [LICENSE](LICENSE) and [NOTICE](NOTICE).
 ---
 
-**Made for secure, frictionless guest access.** Questions? Check the [full documentation](docs/USER_DOCUMENTATION.md).

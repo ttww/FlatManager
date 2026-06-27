@@ -146,7 +146,28 @@ def access_log_to_summary(
         result=access_log.result,
         reason=access_log.reason,
         command_id=access_log.command_id,
+        access_code_id=access_log.access_code_id,
     )
+
+
+def has_overlapping_code_window(
+    session: Session,
+    *,
+    apartment_id: str,
+    code_hash: str,
+    valid_from: datetime,
+    valid_until: datetime,
+) -> bool:
+    """Return True when same code overlaps in time for the same apartment."""
+    overlapping = session.exec(
+        select(AccessCode).where(
+            AccessCode.apartment_id == apartment_id,
+            AccessCode.code_hash == code_hash,
+            AccessCode.valid_from <= valid_until,
+            AccessCode.valid_until >= valid_from,
+        )
+    ).first()
+    return overlapping is not None
 
 
 def access_code_to_summary(
@@ -1106,11 +1127,29 @@ def admin_create_access_code(
     apartment = get_apartment_or_404(session, payload.apartment_id)
     input_timezone = payload.input_timezone or apartment.timezone
     code_hash = hash_access_code(payload.apartment_id, payload.code)
+    valid_from = normalize_datetime_to_utc(payload.valid_from, input_timezone=input_timezone)
+    valid_until = normalize_datetime_to_utc(payload.valid_until, input_timezone=input_timezone)
+
+    if has_overlapping_code_window(
+        session,
+        apartment_id=payload.apartment_id,
+        code_hash=code_hash,
+        valid_from=valid_from,
+        valid_until=valid_until,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Code already exists in an overlapping time window for this apartment. "
+                "Please choose a different code."
+            ),
+        )
+
     access_code = AccessCode(
         apartment_id=payload.apartment_id,
         code_hash=code_hash,
-        valid_from=normalize_datetime_to_utc(payload.valid_from, input_timezone=input_timezone),
-        valid_until=normalize_datetime_to_utc(payload.valid_until, input_timezone=input_timezone),
+        valid_from=valid_from,
+        valid_until=valid_until,
         max_uses=payload.max_uses,
         booking_reference=payload.booking_reference,
         guest_name=payload.guest_name,
