@@ -5,3 +5,4 @@ api/.env
 esp/include/secrets.h
 esp/compile_commands.json
 docs/node_modules/
+*.pyc

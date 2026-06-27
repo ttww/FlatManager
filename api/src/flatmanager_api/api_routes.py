@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import logging
 import time
@@ -12,6 +13,7 @@ from sqlalchemy import func
 from sqlmodel import Session, select
 
 from .db import get_session
+from .device_queue import get_queue_manager
 from .models import AccessCode, AccessLog, Apartment, Device, DoorCommand
 from .schemas import (
     AccessLogSummaryResponse,
@@ -32,8 +34,8 @@ from .schemas import (
     CommandResultResponse,
     CommandSummaryResponse,
     DeviceStatusResponse,
-    GuestOpenRequest,
     GuestCommandStatusResponse,
+    GuestOpenRequest,
     GuestOpenResponse,
     WaitCommandResponse,
 )
@@ -587,6 +589,47 @@ def expire_pending_commands(session: Session, *, device_id: int) -> None:
         command.acknowledged_at = now
 
 
+def fetch_oldest_pending_command(session: Session, *, device_id: int) -> DoorCommand | None:
+    """Fetch oldest non-expired pending command for device."""
+    now = utc_now()
+    command = session.exec(
+        select(DoorCommand)
+        .where(
+            DoorCommand.device_id == device_id,
+            DoorCommand.status == "pending",
+            DoorCommand.expires_at >= now,
+        )
+        .order_by(DoorCommand.created_at.asc())
+    ).first()
+    return command
+
+
+def try_claim_command(session: Session, *, command_id: int, device_id: int) -> DoorCommand | None:
+    """
+    Atomically claim a command by transitioning pending -> delivered.
+
+    Returns the claimed command if successful, None if already claimed or not found.
+    """
+    now = utc_now()
+    command = session.exec(
+        select(DoorCommand).where(
+            DoorCommand.id == command_id,
+            DoorCommand.device_id == device_id,
+            DoorCommand.status == "pending",
+        )
+    ).first()
+
+    if command is None:
+        return None
+
+    command.status = "delivered"
+    command.delivered_at = now
+    session.add(command)
+    session.commit()
+    session.refresh(command)
+    return command
+
+
 @router.post("/guest/open", response_model=GuestOpenResponse)
 def guest_open(
     payload: GuestOpenRequest,
@@ -690,6 +733,10 @@ def guest_open(
     )
 
     session.commit()
+
+    # Signal device queue that a command is ready
+    get_queue_manager().notify(device.id)
+
     return GuestOpenResponse(status="accepted", message=SUCCESS_MESSAGE, command_id=command.id)
 
 
@@ -714,55 +761,78 @@ def guest_command_status(
 
 
 @router.get("/device/wait-command", response_model=WaitCommandResponse)
-def wait_command(
+async def wait_command(
     request: Request,
     session: Annotated[Session, Depends(get_session)],
     device: Annotated[Device, Depends(get_current_device)],
 ) -> WaitCommandResponse:
-    deadline = time.monotonic() + settings.long_poll_timeout_seconds
-    sleep_seconds = settings.long_poll_poll_interval_ms / 1000
+    """
+    Blocking queue wait-command endpoint.
 
-    while True:
-        now = utc_now()
+    1. Update heartbeat on entry
+    2. Check for pending non-expired command
+    3. If found, atomically claim and return
+    4. If not found, wait for queue signal or timeout
+    5. After signal, fetch again and claim atomically
+    6. Update heartbeat on exit
+    """
+    now = utc_now()
+
+    # Heartbeat: entry
+    device.last_seen = now
+    device.updated_at = now
+    device.last_ip = request.client.host if request.client else None
+    device.online_status = "online"
+    session.add(device)
+    session.commit()
+
+    try:
+        # Lazy-expire stale pending commands
         expire_pending_commands(session, device_id=device.id)
 
-        device.last_seen = now
-        device.updated_at = now
-        device.last_ip = request.client.host if request.client else None
-        device.online_status = "online"
-
-        command = session.exec(
-            select(DoorCommand)
-            .where(
-                DoorCommand.device_id == device.id,
-                DoorCommand.status == "pending",
-            )
-            .order_by(DoorCommand.created_at.asc())
-        ).first()
+        # Initial fetch: oldest non-expired pending command
+        command = fetch_oldest_pending_command(session, device_id=device.id)
 
         if command is not None:
-            expires_at = as_utc(command.expires_at)
-            if expires_at is not None and expires_at <= now:
-                command.status = "expired"
-                command.acknowledged_at = now
-                session.commit()
-            else:
-                command.status = "delivered"
-                command.delivered_at = now
-                session.commit()
+            # Atomically claim
+            claimed = try_claim_command(session, command_id=command.id, device_id=device.id)
+            if claimed:
                 return WaitCommandResponse(
-                    command_id=command.id,
-                    command=command.command,
-                    duration_ms=command.duration_ms,
-                    expires_at=command.expires_at,
+                    command_id=claimed.id,
+                    command=claimed.command,
+                    duration_ms=claimed.duration_ms,
+                    expires_at=claimed.expires_at,
                 )
-        else:
-            session.commit()
 
-        if time.monotonic() >= deadline:
-            return WaitCommandResponse(command="none")
+        # No command available; wait for queue signal or timeout
+        queue_manager = get_queue_manager()
+        signaled = await queue_manager.wait_for_signal(
+            device.id, timeout_seconds=settings.long_poll_timeout_seconds
+        )
 
-        time.sleep(sleep_seconds)
+        if signaled:
+            # Signal received; fetch again and attempt claim
+            command = fetch_oldest_pending_command(session, device_id=device.id)
+            if command is not None:
+                claimed = try_claim_command(session, command_id=command.id, device_id=device.id)
+                if claimed:
+                    return WaitCommandResponse(
+                        command_id=claimed.id,
+                        command=claimed.command,
+                        duration_ms=claimed.duration_ms,
+                        expires_at=claimed.expires_at,
+                    )
+
+        # Timeout or no command after signal
+        return WaitCommandResponse(command="none")
+
+    finally:
+        # Heartbeat: exit
+        now = utc_now()
+        device.last_seen = now
+        device.updated_at = now
+        session.add(device)
+        session.commit()
 
 
 @router.post("/device/command-result", response_model=CommandResultResponse)
@@ -985,6 +1055,10 @@ def admin_manual_open(
     )
 
     session.commit()
+
+    # Signal device queue that a command is ready
+    get_queue_manager().notify(device.id)
+
     return AdminManualOpenResponse(
         status="accepted",
         message="Manual open command submitted.",
