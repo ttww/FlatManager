@@ -102,6 +102,29 @@ This module contains the firmware project for ESP8266 ESP-01S and ESP32-S2 LOLIN
 - `lolin_s2_mini`: ESP32-S2 LOLIN S2 Mini USB/serial upload
 - `lolin_s2_mini_ota`: ESP32-S2 LOLIN S2 Mini OTA upload
 
+## Secrets setup
+
+`include/secrets.h` is excluded from version control. Create it from the provided example before building:
+
+```bash
+cp include/secrets.h.example include/secrets.h
+```
+
+Then fill in your values in `secrets.h`:
+
+| Define | Description |
+|---|---|
+| `FM_DEVICE_NAME` | Hostname used for mDNS and OTA |
+| `FM_WIFI_SSID_1` / `FM_WIFI_PASSWORD_1` | Primary Wi-Fi network (required) |
+| `FM_WIFI_SSID_2` / `FM_WIFI_PASSWORD_2` | Fallback Wi-Fi network (leave `""` to skip) |
+| `FM_WIFI_SSID_3` / `FM_WIFI_PASSWORD_3` | Fallback Wi-Fi network (leave `""` to skip) |
+| `FM_API_BASE_URL` | Backend base URL, e.g. `https://your-domain.com` |
+| `FM_DEVICE_TOKEN` | Device token from the admin UI |
+| `FM_TLS_CERT_FINGERPRINT` | ESP8266 only: SHA-1 fingerprint of the backend certificate |
+| `FM_OTA_PASSWORD` | OTA update password (keep non-empty in production) |
+
+Board-specific parameters (relay GPIO, active level, LED pin) stay in `platformio.ini` and do not belong in `secrets.h`.
+
 ## Build and upload
 
 Build the default environment:
