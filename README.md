@@ -2,7 +2,7 @@
 
 **Secure, QR-based guest access for smart doors**
 
-FlatManager is a complete door access solution for short-term guests. Guests scan a QR code, enter a time-limited access code, and instantly open the door via a secure HTTPS connection to an ESP8266 device.
+FlatManager is a complete door access solution for short-term guests. Guests scan a QR code, enter a time-limited access code, and instantly open the door via a secure HTTPS connection to an ESP8266 or ESP32 device connected to a relay that triggers the door opener contact.
 
 ## Key Features
 
