@@ -21,7 +21,28 @@ Notes:
 - The token comes from your backend environment (`ADMIN_TOKEN` in `api/.env`).
 - If login fails, verify API is running and token is correct.
 
-### 1.2 Create an Access Code
+### 1.2 Manage Apartments and Share Guest Links
+
+The **Apartments** page is where you create apartments, assign timezones, and generate the guest-facing QR code / deep-link for each apartment.
+
+#### Generate a Guest QR Code
+
+1. Open **Apartments** in the left menu.
+2. Find the apartment row you want to share.
+3. Click **QR Code**.
+4. A modal opens showing:
+   - A scannable QR code that opens the guest UI pre-filled with the apartment ID.
+   - The full guest link as text.
+   - **Copy Link** — copies the URL to the clipboard.
+   - **Download PNG** — saves a high-resolution QR image for printing or embedding in welcome materials.
+
+![Admin QR Code Modal](./screenshots/admin-07-qr-modal.png)
+
+> Guests who scan the code go directly to the door-open form with the apartment ID already filled in — they only need to enter their access code.
+
+---
+
+### 1.3 Create an Access Code
 
 1. Open **Access Codes** in the left menu.
 2. Fill in:
@@ -38,7 +59,7 @@ Tips:
 - Use a future **Valid Until** time.
 - If guest access is denied, check if the code is active and in validity range.
 
-### 1.3 Manage Devices
+### 1.4 Manage Devices
 
 1. Open **Devices**.
 2. Confirm at least one device exists for the apartment.
@@ -50,7 +71,7 @@ Tips:
 Why this matters:
 - Guest access can only trigger a door command when a device is registered for the apartment.
 
-### 1.4 Check Command History
+### 1.5 Check Command History
 
 1. Open **Commands**.
 2. Look for rows with status changes (`pending` -> `delivered` -> `done`).
@@ -58,7 +79,7 @@ Why this matters:
 
 ![Admin Commands](./screenshots/admin-04-commands.png)
 
-### 1.5 Check Access Logs
+### 1.6 Check Access Logs
 
 1. Open **Access Logs**.
 2. Use this page to audit each attempt:
@@ -68,7 +89,7 @@ Why this matters:
 
 ![Admin Access Logs](./screenshots/admin-05-logs.png)
 
-### 1.6 Trigger Manual Open (Support)
+### 1.7 Trigger Manual Open (Support)
 
 1. Open **Support**.
 2. Enter apartment ID.
@@ -83,22 +104,41 @@ Use this only for verified support cases.
 
 ## 2. Guest Guide
 
-### 2.1 Open Door Request (Normal Flow)
+### 2.1 Receiving Your Guest Link
+
+Your host provides access as a **QR code** or a direct link — you do not need to know the apartment ID yourself.
+
+![Guest QR Code](./screenshots/guest-00-qr.png)
+
+**To use the QR code:**
+1. Open your phone's camera (or a QR scanner app).
+2. Point it at the printed or on-screen QR code.
+3. Tap the notification that appears — your browser opens directly to the door-open form with the apartment ID already filled in.
+
+**If you received a link instead:**
+- Tap or click the link. It opens the same form with the apartment ID pre-filled.
+- You can bookmark it for the duration of your stay.
+
+> The link looks like `https://<host>/guest/?apartment_id=<your-apartment>`. You only need to enter your access code — everything else is handled automatically.
+
+---
+
+### 2.2 Open Door Request (Normal Flow)
 
 1. Open `http://localhost:8081`.
-2. Enter apartment ID.
+2. Enter apartment ID (pre-filled when arriving via QR code or link).
 3. Enter access code.
 4. Click **Open Door**.
 
 ![Guest Open Form](./screenshots/guest-01-open-form.png)
 
-### 2.2 Successful Request
+### 2.3 Successful Request
 
 If the request is valid, the user sees a success message (language depends on selected locale).
 
 ![Guest Success](./screenshots/guest-02-success.png)
 
-### 2.3 Failed Request
+### 2.4 Failed Request
 
 If code is wrong/expired/inactive, the user sees a denial message.
 
@@ -106,7 +146,7 @@ If code is wrong/expired/inactive, the user sees a denial message.
 
 ---
 
-## 2.4 Multilingual Interface (18 Languages)
+## 2.5 Multilingual Interface (18 Languages)
 
 FlatManager supports **18 languages** with full interface localization. Guests can select their preferred language from the dropdown at the top of the page.
 

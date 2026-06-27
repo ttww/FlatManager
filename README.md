@@ -58,14 +58,25 @@ Services run on:
 
 ## Guest Experience
 
-Guests receive a **personalized QR code link** (pre-filled apartment):
+The typical flow for a short-term guest (Airbnb, holiday flat, etc.):
+
+1. **Before check-in** the host generates a QR code in the admin dashboard and shares it — printed on a welcome card, sent by message, or included in the booking confirmation.
+2. **On arrival** the guest scans the code with their phone camera. No app required.
+3. The browser opens directly to the door-open form, apartment ID already filled in.
+4. The guest enters their time-limited access code and taps **Open Door**.
+5. The backend validates the code, sends a command to the ESP device over a persistent HTTPS connection, and the relay triggers the door opener immediately.
+
+<p align="center">
+        <img src="docs/screenshots/guest-00-qr.png" width="250" alt="Admin QR code modal — scanning opens the guest form pre-filled with the apartment ID">
+        <br><em>The admin generates a per-apartment QR code. Scanning it opens the guest form with the apartment pre-filled.</em>
+</p>
 
 ![Guest Entry Form](docs/screenshots/guest-01-open-form.png)
 
 They enter their code, press "Open Door", and see:
-- ✅ **Success** → "Door opening requested. Please wait a moment."
-- ❌ **Denied** → "Code invalid or not valid."
-- ⏱️ **Timeout** → "The request took too long. Please try again."
+- ✅ **Success** → door opens, confirmation message shown.
+- ❌ **Denied** → code invalid, expired, or not yet valid.
+- ⏱️ **Timeout** → device unreachable; retry or contact host.
 
 ---
 
@@ -150,6 +161,8 @@ Removes old images and build cache to ensure no secrets are baked in.
 ## Configuration
 
 Key environment variables (`api/.env`):
+
+Generate strong random values with `openssl rand -hex 32`.
 
 ```env
 ADMIN_TOKEN=your-secure-token

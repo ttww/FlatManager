@@ -36,5 +36,5 @@ location /api/device/wait-command {
 
 - Use a process manager for the API service.
 - Restrict network exposure to required ports only.
-- Rotate admin token and pepper on a defined schedule.
+- Rotate admin token and pepper on a defined schedule (`openssl rand -hex 32` generates suitable values).
 - Collect and monitor access logs and command failure rates.
