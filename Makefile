@@ -8,7 +8,7 @@ DOCS_URL ?= /api/docs
 REDOC_URL ?= /api/redoc
 OPENAPI_URL ?= /api/openapi.json
 
-.PHONY: build up down restart logs ps push publish
+.PHONY: build up down restart logs ps push publish pull
 
 build:
 	IMAGE_REPO=$(IMAGE_REPO) TAG=$(TAG) VITE_API_BASE_URL=$(VITE_API_BASE_URL) ADMIN_BASE_PATH=$(ADMIN_BASE_PATH) GUEST_BASE_PATH=$(GUEST_BASE_PATH) DOCS_URL=$(DOCS_URL) REDOC_URL=$(REDOC_URL) OPENAPI_URL=$(OPENAPI_URL) $(COMPOSE) build
@@ -40,3 +40,6 @@ push:
 	IMAGE_REPO=$(IMAGE_REPO) TAG=$(TAG) $(COMPOSE) push
 
 publish: build push
+
+pull:
+	git pull
