@@ -39,6 +39,10 @@ export function LogsPage({ timezoneDisplayMode, browserTimezone }: LogsPageProps
 
   const displayTimezone = (apartmentTimezone: string) =>
     getDisplayTimezone(timezoneDisplayMode, apartmentTimezone, browserTimezone);
+  const timeHeaderLabel =
+    timezoneDisplayMode === "local"
+      ? `Time (Local: ${browserTimezone})`
+      : "Time (Apartment Timezone)";
 
   return (
     <section className="panel">
@@ -59,7 +63,7 @@ export function LogsPage({ timezoneDisplayMode, browserTimezone }: LogsPageProps
         <table>
           <thead>
             <tr>
-              <th>Time</th>
+              <th>{timeHeaderLabel}</th>
               <th>Apartment</th>
               <th>Result</th>
               <th>Reason</th>
