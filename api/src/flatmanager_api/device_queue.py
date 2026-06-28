@@ -28,6 +28,11 @@ class DeviceQueueManager:
             self._events[device_id] = asyncio.Event()
         self._events[device_id].set()
 
+    def notify_all(self) -> None:
+        """Signal waiters for all devices (used for graceful shutdown)."""
+        for event in self._events.values():
+            event.set()
+
     async def wait_for_signal(self, device_id: int, timeout_seconds: float) -> bool:
         """
         Wait for a signal for this device with timeout.

@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import models  # noqa: F401
 from .api_routes import router as api_router
 from .db import init_db
+from .device_queue import get_queue_manager
 from .logging_config import configure_logging
 from .settings import settings
 
@@ -31,6 +32,12 @@ app.include_router(api_router)
 @app.on_event("startup")
 def on_startup() -> None:
     init_db()
+
+
+@app.on_event("shutdown")
+def on_shutdown() -> None:
+    # Wake long-poll waiters so shutdown does not block on poll timeout.
+    get_queue_manager().notify_all()
 
 
 @app.get("/health", tags=["system"])
