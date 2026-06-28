@@ -1,4 +1,5 @@
-from collections.abc import Generator
+import asyncio
+from collections.abc import AsyncGenerator
 from functools import lru_cache
 from pathlib import Path
 
@@ -27,6 +28,14 @@ def init_db() -> None:
     SQLModel.metadata.create_all(get_engine())
 
 
-def get_session() -> Generator[Session, None, None]:
-    with Session(get_engine()) as session:
+async def get_session() -> AsyncGenerator[Session, None]:
+    session = Session(get_engine())
+    try:
         yield session
+    finally:
+        try:
+            # During shutdown, request tasks may be cancelled while dependencies unwind.
+            # Shield close() so this teardown does not surface cancellation tracebacks.
+            await asyncio.shield(asyncio.to_thread(session.close))
+        except asyncio.CancelledError:
+            pass
