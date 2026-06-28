@@ -242,9 +242,24 @@ def token_fingerprint(token: str) -> str:
 
 
 def guest_background_directory() -> Path:
-    directory = Path(settings.guest_backgrounds_dir)
-    directory.mkdir(parents=True, exist_ok=True)
-    return directory
+    configured = Path(settings.guest_backgrounds_dir)
+    directory = configured if configured.is_absolute() else (Path.cwd() / configured)
+
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory.resolve()
+    except PermissionError:
+        if settings.database_url.startswith("sqlite:///"):
+            db_file = settings.database_url.replace("sqlite:///", "", 1)
+            db_path = Path(db_file)
+            if not db_path.is_absolute():
+                db_path = (Path.cwd() / db_path).resolve()
+
+            fallback = db_path.parent / "guest-backgrounds"
+            fallback.mkdir(parents=True, exist_ok=True)
+            return fallback
+
+        raise
 
 
 def normalize_background_extension(file: UploadFile) -> str | None:

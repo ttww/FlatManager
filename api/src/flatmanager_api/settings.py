@@ -1,11 +1,9 @@
-from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-BASE_DIR = Path(__file__).resolve().parents[2]
-DEFAULT_DB_PATH = BASE_DIR / "data" / "flatmanager.db"
+DEFAULT_DB_PATH = "./data/flatmanager.db"
 
 
 class Settings(BaseSettings):
@@ -56,7 +54,7 @@ class Settings(BaseSettings):
     guest_min_retry_interval_seconds: float = Field(default=1.5)
     guest_min_retry_failures_threshold: int = Field(default=3)
 
-    guest_backgrounds_dir: str = Field(default=str(BASE_DIR / "data" / "guest-backgrounds"))
+    guest_backgrounds_dir: str = Field(default="./data/guest-backgrounds")
     guest_background_max_bytes: int = Field(default=5 * 1024 * 1024)
     guest_background_url_ttl_seconds: int = Field(default=120)
 

@@ -6,3 +6,4 @@ esp/include/secrets.h
 esp/compile_commands.json
 docs/node_modules/
 *.pyc
+/api/data/guest-backgrounds
