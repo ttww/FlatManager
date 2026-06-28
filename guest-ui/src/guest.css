@@ -15,8 +15,8 @@
   inset: 0;
   background: linear-gradient(
     180deg,
-    color-mix(in oklab, var(--bg), transparent 44%),
-    color-mix(in oklab, var(--bg), transparent 22%)
+    color-mix(in oklab, var(--bg), transparent 55%),
+    color-mix(in oklab, var(--bg), transparent 33%)
   );
 }
 

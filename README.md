@@ -257,3 +257,6 @@ FlatManager is licensed under the Apache License, Version 2.0.
 See [LICENSE](LICENSE) and [NOTICE](NOTICE).
 ---
 
+## TODO
+- reformat the code page: "from" and "to" page should be on the same line
+- If we have a guest name: The open ui should display a welcome message
