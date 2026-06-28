@@ -3,6 +3,7 @@ from collections.abc import AsyncGenerator
 from functools import lru_cache
 from pathlib import Path
 
+from sqlalchemy import inspect, text
 from sqlmodel import Session, SQLModel, create_engine
 
 from .settings import settings
@@ -25,7 +26,37 @@ def reset_engine_cache() -> None:
 
 
 def init_db() -> None:
-    SQLModel.metadata.create_all(get_engine())
+    engine = get_engine()
+    SQLModel.metadata.create_all(engine)
+    _ensure_schema_compatibility(engine)
+
+
+def _ensure_schema_compatibility(engine) -> None:
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    if "apartments" not in table_names:
+        return
+
+    column_names = {
+        column_info["name"] for column_info in inspector.get_columns("apartments")
+    }
+
+    with engine.begin() as connection:
+        if "guest_background_filename" not in column_names:
+            connection.execute(
+                text(
+                    "ALTER TABLE apartments "
+                    "ADD COLUMN guest_background_filename VARCHAR(255)"
+                )
+            )
+
+        if "guest_background_updated_at" not in column_names:
+            connection.execute(
+                text(
+                    "ALTER TABLE apartments "
+                    "ADD COLUMN guest_background_updated_at DATETIME"
+                )
+            )
 
 
 async def get_session() -> AsyncGenerator[Session, None]:
