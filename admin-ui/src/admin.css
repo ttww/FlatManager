@@ -73,7 +73,7 @@
   border: 1px solid var(--line);
   border-radius: 14px;
   background: #ffffffcc;
-  padding: 6px 10px;
+  padding: 0 10px;
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
@@ -81,11 +81,21 @@
   width: fit-content;
   max-width: 100%;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  height: 38px;
+  min-height: 38px;
+  max-height: 38px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
 }
 
 .timezone-toolbar p {
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
 }
 
 .timezone-toggle {
@@ -94,6 +104,7 @@
   border-radius: 999px;
   overflow: hidden;
   background: #fff;
+  flex: 0 0 auto;
 }
 
 .timezone-toggle button {
@@ -102,6 +113,7 @@
   padding: 4px 10px;
   font: inherit;
   font-size: 0.88rem;
+  line-height: 1;
   cursor: pointer;
 }
 
@@ -440,9 +452,12 @@ code {
   }
 
   .timezone-toolbar {
-    flex-direction: column;
-    align-items: flex-start;
     width: 100%;
+    justify-self: stretch;
+  }
+
+  .timezone-toolbar p {
+    max-width: 220px;
   }
 }
 
