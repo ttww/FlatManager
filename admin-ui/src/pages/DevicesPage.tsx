@@ -127,6 +127,10 @@ export function DevicesPage({ timezoneDisplayMode, browserTimezone }: DevicesPag
 
   const displayTimezone = (apartmentTimezone: string) =>
     getDisplayTimezone(timezoneDisplayMode, apartmentTimezone, browserTimezone);
+  const lastSeenHeaderLabel =
+    timezoneDisplayMode === "local"
+      ? `Last Seen (Local: ${browserTimezone})`
+      : "Last Seen (Apartment)";
 
   return (
     <section className="panel">
@@ -181,7 +185,7 @@ export function DevicesPage({ timezoneDisplayMode, browserTimezone }: DevicesPag
               <th>Apartment</th>
               <th>Name</th>
               <th>Status</th>
-              <th>Last Seen</th>
+              <th>{lastSeenHeaderLabel}</th>
               <th>Actions</th>
             </tr>
           </thead>

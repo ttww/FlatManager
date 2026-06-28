@@ -1,8 +1,17 @@
 export type TimezoneDisplayMode = "local" | "apartment";
 
+function parseApiDate(input: string): Date {
+  // Backend stores UTC; if timezone is omitted in JSON, interpret as UTC.
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(input);
+  if (!hasTimezone && /^\d{4}-\d{2}-\d{2}T/.test(input)) {
+    return new Date(`${input}Z`);
+  }
+  return new Date(input);
+}
+
 export function formatDateTime(input: string | null, timezone = "UTC"): string {
   if (!input) return "-";
-  const date = new Date(input);
+  const date = parseApiDate(input);
   if (Number.isNaN(date.getTime())) return input;
 
   try {

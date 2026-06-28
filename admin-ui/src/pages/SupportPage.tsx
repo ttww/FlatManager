@@ -5,6 +5,8 @@ import { api } from "../lib/api";
 import { getAdminToken } from "../lib/session";
 import type { ApartmentTimezone } from "../types";
 
+const ADMIN_UI_VERSION = import.meta.env.VITE_APP_VERSION ?? "0.0.0";
+
 export function SupportPage() {
   const [apartmentId, setApartmentId] = useState("");
   const [apartmentIds, setApartmentIds] = useState<string[]>([]);
@@ -59,6 +61,34 @@ export function SupportPage() {
         <li>Use manual open only for verified support cases.</li>
         <li>Provide fallback instructions (physical key) if device remains offline.</li>
       </ul>
+
+      <section className="support-info-panel" aria-label="Product information">
+        <h3>Product Information</h3>
+
+        <div className="support-info-grid">
+          <article>
+            <h4>General / Principal Usage Notice</h4>
+            <p>
+              FlatManager is intended for authorized apartment access operations,
+              support workflows, and audit visibility. Use this system only in
+              accordance with local regulations and your organization&apos;s policy.
+            </p>
+          </article>
+
+          <article>
+            <h4>License</h4>
+            <p>
+              Apache License 2.0. See the root LICENSE and NOTICE files for
+              details about rights, obligations, and attribution.
+            </p>
+          </article>
+
+          <article>
+            <h4>Version</h4>
+            <p>Admin UI version: {ADMIN_UI_VERSION}</p>
+          </article>
+        </div>
+      </section>
     </section>
   );
 }

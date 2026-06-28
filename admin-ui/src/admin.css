@@ -73,11 +73,15 @@
   border: 1px solid var(--line);
   border-radius: 14px;
   background: #ffffffcc;
-  padding: 10px 12px;
-  display: flex;
+  padding: 6px 10px;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-start;
+  justify-self: start;
+  width: fit-content;
+  max-width: 100%;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .timezone-toolbar p {
@@ -95,8 +99,9 @@
 .timezone-toggle button {
   border: 0;
   background: transparent;
-  padding: 6px 12px;
+  padding: 4px 10px;
   font: inherit;
+  font-size: 0.88rem;
   cursor: pointer;
 }
 
@@ -317,6 +322,41 @@ code {
   color: var(--muted);
 }
 
+.support-info-panel {
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fcfffd;
+  padding: 14px;
+}
+
+.support-info-panel h3 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+
+.support-info-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.support-info-grid article {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: #fff;
+}
+
+.support-info-grid h4 {
+  margin: 0 0 6px;
+  font-size: 0.92rem;
+}
+
+.support-info-grid p {
+  margin: 0;
+  color: var(--muted);
+}
+
 /* QR Modal */
 .modal-backdrop {
   position: fixed;
@@ -402,6 +442,7 @@ code {
   .timezone-toolbar {
     flex-direction: column;
     align-items: flex-start;
+    width: 100%;
   }
 }
 
