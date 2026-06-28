@@ -847,6 +847,11 @@ async def wait_command(
         # Timeout or no command after signal
         return WaitCommandResponse(command="none")
 
+    except asyncio.CancelledError:
+        # Uvicorn may cancel long-poll requests during shutdown once graceful timeout elapses.
+        logger.info("wait-command cancelled during shutdown for device_id=%s", device.id)
+        return WaitCommandResponse(command="none")
+
     finally:
         # Heartbeat: exit
         now = utc_now()
