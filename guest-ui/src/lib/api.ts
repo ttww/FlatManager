@@ -113,3 +113,29 @@ export async function fetchGuestCommandStatus(commandId: number, apartmentId: st
 
   return body.status as GuestCommandStatus;
 }
+
+export async function fetchGuestBackgroundUrl(apartmentId: string): Promise<string | null> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 8000);
+
+  let response: Response;
+  try {
+    const url = new URL(`${API_BASE}/api/guest/background-url`);
+    url.searchParams.set("apartment_id", apartmentId);
+    response = await fetch(url.toString(), {
+      method: "GET",
+      signal: controller.signal,
+    });
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const body = (await response.json()) as { image_url?: string | null };
+  return typeof body.image_url === "string" && body.image_url ? body.image_url : null;
+}

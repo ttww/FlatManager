@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { localeMeta, localeOptions, messages, type Locale } from "../i18n/messages";
-import { fetchGuestCommandStatus, GuestApiError, requestDoorOpen } from "../lib/api";
+import { fetchGuestBackgroundUrl, fetchGuestCommandStatus, GuestApiError, requestDoorOpen } from "../lib/api";
 import { trackEvent } from "../lib/tracking";
 
 type UiState =
@@ -51,6 +51,7 @@ export function GuestOpenPage() {
   const [code, setCode] = useState("");
   const [uiState, setUiState] = useState<UiState>("idle");
   const [commandId, setCommandId] = useState<number | null>(null);
+  const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(null);
   const [errorText, setErrorText] = useState("");
   const isApartmentLocked = prefilledApartmentId !== null;
 
@@ -238,8 +239,34 @@ export function GuestOpenPage() {
     };
   }, [apartmentId, commandId, uiState]);
 
+  useEffect(() => {
+    const apartment = apartmentId.trim();
+    if (!apartment) {
+      setBackgroundImageUrl(null);
+      return;
+    }
+
+    let cancelled = false;
+    const loadBackground = async () => {
+      const url = await fetchGuestBackgroundUrl(apartment);
+      if (!cancelled) {
+        setBackgroundImageUrl(url);
+      }
+    };
+
+    void loadBackground();
+    return () => {
+      cancelled = true;
+    };
+  }, [apartmentId]);
+
   return (
-    <main className="guest-shell" dir={currentLocaleMeta.dir} lang={currentLocaleMeta.lang}>
+    <main
+      className={`guest-shell ${backgroundImageUrl ? "with-background" : ""}`}
+      dir={currentLocaleMeta.dir}
+      lang={currentLocaleMeta.lang}
+      style={backgroundImageUrl ? { backgroundImage: `url("${backgroundImageUrl}")` } : undefined}
+    >
       <section className="guest-card" aria-live="polite">
         <div className="top-row">
           <div>

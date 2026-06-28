@@ -95,4 +95,5 @@ export type AccessCodeSummary = {
 export type ApartmentTimezone = {
   apartment_id: string;
   timezone: string;
+  has_guest_background?: boolean;
 };

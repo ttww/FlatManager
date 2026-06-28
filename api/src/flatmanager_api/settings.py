@@ -51,6 +51,16 @@ class Settings(BaseSettings):
 
     lockout_window_seconds: int = Field(default=600)
     lockout_failed_attempts_threshold: int = Field(default=5)
+    lockout_ip_failed_attempts_threshold: int = Field(default=12)
+    lockout_apartment_failed_attempts_threshold: int = Field(default=24)
+    guest_min_retry_interval_seconds: float = Field(default=1.5)
+    guest_min_retry_failures_threshold: int = Field(default=3)
+
+    guest_backgrounds_dir: str = Field(default=str(BASE_DIR / "data" / "guest-backgrounds"))
+    guest_background_max_bytes: int = Field(default=5 * 1024 * 1024)
+    guest_background_url_ttl_seconds: int = Field(default=120)
+
+    trusted_ip_allowlist: str = Field(default="109.90.33.191")
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -68,6 +78,13 @@ class Settings(BaseSettings):
                 f"Invalid logging timezone '{value}'. Use IANA names like Europe/Berlin."
             ) from error
         return value
+
+    def trusted_ip_set(self) -> set[str]:
+        return {
+            candidate.strip()
+            for candidate in self.trusted_ip_allowlist.split(",")
+            if candidate.strip()
+        }
 
 
 settings = Settings()

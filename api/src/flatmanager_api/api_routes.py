@@ -1,13 +1,17 @@
 import asyncio
 import hashlib
+import hmac
 import logging
+import mimetypes
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 from secrets import token_urlsafe
 from typing import Annotated
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Request, UploadFile, status
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import func
 from sqlmodel import Session, select
@@ -34,6 +38,7 @@ from .schemas import (
     CommandResultResponse,
     CommandSummaryResponse,
     DeviceStatusResponse,
+    GuestBackgroundUrlResponse,
     GuestCommandStatusResponse,
     GuestOpenRequest,
     GuestOpenResponse,
@@ -48,10 +53,24 @@ logger = logging.getLogger(__name__)
 
 NEUTRAL_DENIED_MESSAGE = "Code invalid or not valid."
 SUCCESS_MESSAGE = "Door opening requested."
+GUEST_BACKGROUND_ALLOWED_CONTENT_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
+GUEST_BACKGROUND_ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+def apartment_to_summary(apartment: Apartment) -> AdminApartmentTimezoneSummaryResponse:
+    return AdminApartmentTimezoneSummaryResponse(
+        apartment_id=apartment.apartment_id,
+        timezone=apartment.timezone,
+        has_guest_background=apartment.guest_background_filename is not None,
+    )
 
 
 def as_utc(value: datetime | None) -> datetime | None:
@@ -79,7 +98,9 @@ def validate_timezone_name(timezone_name: str) -> str:
     except ZoneInfoNotFoundError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid timezone '{timezone_name}'. Use IANA timezone names like Europe/Berlin.",
+            detail=(
+                f"Invalid timezone '{timezone_name}'. Use IANA timezone names like Europe/Berlin."
+            ),
         ) from error
 
     return timezone_name
@@ -204,8 +225,13 @@ def device_to_summary(device: Device, apartment_timezone: str) -> AdminDeviceSum
 
 
 def require_admin_token(
+    request: Request,
     x_admin_token: Annotated[str | None, Header()] = None,
 ) -> None:
+    client_ip = request.client.host if request.client else "unknown"
+    if client_ip in settings.trusted_ip_set():
+        return
+
     if not x_admin_token or x_admin_token != settings.admin_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin token")
 
@@ -213,6 +239,62 @@ def require_admin_token(
 def token_fingerprint(token: str) -> str:
     digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
     return digest[:12]
+
+
+def guest_background_directory() -> Path:
+    directory = Path(settings.guest_backgrounds_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
+def normalize_background_extension(file: UploadFile) -> str | None:
+    filename = (file.filename or "").lower()
+    if "." in filename:
+        extension = f".{filename.rsplit('.', 1)[1]}"
+        if extension in GUEST_BACKGROUND_ALLOWED_EXTENSIONS:
+            if extension == ".jpeg":
+                return ".jpg"
+            return extension
+
+    content_type = (file.content_type or "").lower()
+    return GUEST_BACKGROUND_ALLOWED_CONTENT_TYPES.get(content_type)
+
+
+def build_guest_background_filename(apartment_id: str, extension: str) -> str:
+    safe_apartment = "".join(ch if ch.isalnum() or ch in ("-", "_") else "-" for ch in apartment_id)
+    return f"{safe_apartment}-{token_urlsafe(18)}{extension}"
+
+
+def apartment_background_path(apartment: Apartment) -> Path | None:
+    if not apartment.guest_background_filename:
+        return None
+
+    filename = Path(apartment.guest_background_filename).name
+    candidate = (guest_background_directory() / filename).resolve()
+    base = guest_background_directory().resolve()
+
+    if base not in candidate.parents and candidate != base:
+        return None
+
+    return candidate
+
+
+def sign_guest_background(apartment_id: str, exp: int) -> str:
+    payload = f"{apartment_id}:{exp}".encode()
+    secret = settings.security_pepper.encode("utf-8")
+    return hmac.new(secret, payload, hashlib.sha256).hexdigest()
+
+
+def verify_guest_background_signature(apartment_id: str, exp: int, signature: str) -> bool:
+    expected = sign_guest_background(apartment_id, exp)
+    return hmac.compare_digest(expected, signature)
+
+
+def build_guest_background_url(request: Request, apartment_id: str) -> str:
+    exp = int(time.time()) + settings.guest_background_url_ttl_seconds
+    sig = sign_guest_background(apartment_id, exp)
+    base_url = str(request.url_for("guest_get_background", apartment_id=apartment_id))
+    return f"{base_url}?exp={exp}&sig={sig}"
 
 
 @router.get(
@@ -228,13 +310,7 @@ def admin_list_apartments(
     if apartment_id:
         query = query.where(Apartment.apartment_id == apartment_id)
 
-    return [
-        AdminApartmentTimezoneSummaryResponse(
-            apartment_id=apartment.apartment_id,
-            timezone=apartment.timezone,
-        )
-        for apartment in session.exec(query).all()
-    ]
+    return [apartment_to_summary(apartment) for apartment in session.exec(query).all()]
 
 
 @router.get(
@@ -247,10 +323,7 @@ def admin_get_apartment(
     session: Annotated[Session, Depends(get_session)],
 ) -> AdminApartmentTimezoneSummaryResponse:
     apartment = get_apartment_or_404(session, apartment_id)
-    return AdminApartmentTimezoneSummaryResponse(
-        apartment_id=apartment.apartment_id,
-        timezone=apartment.timezone,
-    )
+    return apartment_to_summary(apartment)
 
 
 @router.post(
@@ -281,10 +354,7 @@ def admin_create_apartment(
     session.commit()
     session.refresh(apartment)
 
-    return AdminApartmentTimezoneSummaryResponse(
-        apartment_id=apartment.apartment_id,
-        timezone=apartment.timezone,
-    )
+    return apartment_to_summary(apartment)
 
 
 @router.put(
@@ -304,10 +374,75 @@ def admin_update_apartment_timezone(
     session.add(apartment)
     session.commit()
 
-    return AdminApartmentTimezoneSummaryResponse(
-        apartment_id=apartment.apartment_id,
-        timezone=apartment.timezone,
-    )
+    return apartment_to_summary(apartment)
+
+
+@router.post(
+    "/admin/apartments/{apartment_id}/guest-background",
+    response_model=AdminApartmentTimezoneSummaryResponse,
+    dependencies=[Depends(require_admin_token)],
+)
+async def admin_upload_apartment_guest_background(
+    apartment_id: str,
+    session: Annotated[Session, Depends(get_session)],
+    file: Annotated[UploadFile, File(...)],
+) -> AdminApartmentTimezoneSummaryResponse:
+    apartment = get_apartment_or_404(session, apartment_id)
+    extension = normalize_background_extension(file)
+    if extension is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported image format. Use JPG, PNG, or WEBP.",
+        )
+
+    payload = await file.read()
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty image file.")
+    if len(payload) > settings.guest_background_max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Image too large.",
+        )
+
+    filename = build_guest_background_filename(apartment_id, extension)
+    target_path = guest_background_directory() / filename
+    target_path.write_bytes(payload)
+
+    previous_path = apartment_background_path(apartment)
+    apartment.guest_background_filename = filename
+    apartment.guest_background_updated_at = utc_now()
+    apartment.updated_at = utc_now()
+    session.add(apartment)
+    session.commit()
+
+    if previous_path and previous_path.exists() and previous_path.name != filename:
+        previous_path.unlink(missing_ok=True)
+
+    return apartment_to_summary(apartment)
+
+
+@router.delete(
+    "/admin/apartments/{apartment_id}/guest-background",
+    response_model=AdminApartmentTimezoneSummaryResponse,
+    dependencies=[Depends(require_admin_token)],
+)
+def admin_delete_apartment_guest_background(
+    apartment_id: str,
+    session: Annotated[Session, Depends(get_session)],
+) -> AdminApartmentTimezoneSummaryResponse:
+    apartment = get_apartment_or_404(session, apartment_id)
+    existing_path = apartment_background_path(apartment)
+
+    apartment.guest_background_filename = None
+    apartment.guest_background_updated_at = utc_now()
+    apartment.updated_at = utc_now()
+    session.add(apartment)
+    session.commit()
+
+    if existing_path and existing_path.exists():
+        existing_path.unlink(missing_ok=True)
+
+    return apartment_to_summary(apartment)
 
 
 @router.delete(
@@ -565,6 +700,7 @@ def is_rate_limited(session: Session, *, apartment_id: str, ip_address: str) -> 
             select(func.count(AccessLog.id)).where(
                 AccessLog.timestamp >= window_start_dt,
                 AccessLog.ip_address == ip_address,
+                AccessLog.apartment_id == apartment_id,
             )
         ).one()
     )
@@ -593,7 +729,67 @@ def is_locked_out(session: Session, *, apartment_id: str, ip_address: str) -> bo
         result="denied",
         reason="validation_failed",
     )
-    return failed_attempts >= settings.lockout_failed_attempts_threshold
+
+    window_start = utc_now().timestamp() - settings.lockout_window_seconds
+    window_start_dt = datetime.fromtimestamp(window_start, UTC)
+
+    failed_by_ip = int(
+        session.exec(
+            select(func.count(AccessLog.id)).where(
+                AccessLog.timestamp >= window_start_dt,
+                AccessLog.ip_address == ip_address,
+                AccessLog.apartment_id == apartment_id,
+                AccessLog.result == "denied",
+                AccessLog.reason == "validation_failed",
+            )
+        ).one()
+    )
+
+    failed_by_apartment = int(
+        session.exec(
+            select(func.count(AccessLog.id)).where(
+                AccessLog.timestamp >= window_start_dt,
+                AccessLog.apartment_id == apartment_id,
+                AccessLog.result == "denied",
+                AccessLog.reason == "validation_failed",
+            )
+        ).one()
+    )
+
+    return (
+        failed_attempts >= settings.lockout_failed_attempts_threshold
+        or failed_by_ip >= settings.lockout_ip_failed_attempts_threshold
+        or failed_by_apartment >= settings.lockout_apartment_failed_attempts_threshold
+    )
+
+
+def is_retry_too_fast(session: Session, *, apartment_id: str, ip_address: str) -> bool:
+    recent_failures = count_guest_attempts(
+        session,
+        apartment_id=apartment_id,
+        ip_address=ip_address,
+        window_seconds=settings.lockout_window_seconds,
+        result="denied",
+        reason="validation_failed",
+    )
+    if recent_failures < settings.guest_min_retry_failures_threshold:
+        return False
+
+    latest_failure = session.exec(
+        select(AccessLog)
+        .where(
+            AccessLog.apartment_id == apartment_id,
+            AccessLog.ip_address == ip_address,
+            AccessLog.result == "denied",
+            AccessLog.reason == "validation_failed",
+        )
+        .order_by(AccessLog.timestamp.desc())
+    ).first()
+    if latest_failure is None:
+        return False
+
+    elapsed = (utc_now() - as_utc(latest_failure.timestamp)).total_seconds()
+    return elapsed < settings.guest_min_retry_interval_seconds
 
 
 def expire_pending_commands(session: Session, *, device_id: int) -> None:
@@ -659,8 +855,11 @@ def guest_open(
 ) -> GuestOpenResponse:
     ip_address = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent")
+    trusted_ip = ip_address in settings.trusted_ip_set()
 
-    if is_rate_limited(session, apartment_id=payload.apartment_id, ip_address=ip_address):
+    if not trusted_ip and is_rate_limited(
+        session, apartment_id=payload.apartment_id, ip_address=ip_address
+    ):
         log_access_event(
             session,
             apartment_id=payload.apartment_id,
@@ -670,9 +869,14 @@ def guest_open(
             reason="rate_limit",
         )
         session.commit()
-        return GuestOpenResponse(status="denied", message=NEUTRAL_DENIED_MESSAGE)
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content=GuestOpenResponse(status="denied", message=NEUTRAL_DENIED_MESSAGE).model_dump(),
+        )
 
-    if is_locked_out(session, apartment_id=payload.apartment_id, ip_address=ip_address):
+    if not trusted_ip and is_locked_out(
+        session, apartment_id=payload.apartment_id, ip_address=ip_address
+    ):
         log_access_event(
             session,
             apartment_id=payload.apartment_id,
@@ -682,7 +886,27 @@ def guest_open(
             reason="lockout",
         )
         session.commit()
-        return GuestOpenResponse(status="denied", message=NEUTRAL_DENIED_MESSAGE)
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content=GuestOpenResponse(status="denied", message=NEUTRAL_DENIED_MESSAGE).model_dump(),
+        )
+
+    if not trusted_ip and is_retry_too_fast(
+        session, apartment_id=payload.apartment_id, ip_address=ip_address
+    ):
+        log_access_event(
+            session,
+            apartment_id=payload.apartment_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            result="rate_limited",
+            reason="retry_too_fast",
+        )
+        session.commit()
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content=GuestOpenResponse(status="denied", message=NEUTRAL_DENIED_MESSAGE).model_dump(),
+        )
 
     code_hash = hash_access_code(payload.apartment_id, payload.code)
     now = utc_now()
@@ -759,6 +983,51 @@ def guest_open(
     get_queue_manager().notify(device.id)
 
     return GuestOpenResponse(status="accepted", message=SUCCESS_MESSAGE, command_id=command.id)
+
+
+@router.get("/guest/background-url", response_model=GuestBackgroundUrlResponse)
+def guest_background_url(
+    apartment_id: str,
+    request: Request,
+    session: Annotated[Session, Depends(get_session)],
+) -> GuestBackgroundUrlResponse:
+    apartment = session.exec(
+        select(Apartment).where(Apartment.apartment_id == apartment_id)
+    ).first()
+    if apartment is None or apartment.guest_background_filename is None:
+        return GuestBackgroundUrlResponse(image_url=None)
+
+    return GuestBackgroundUrlResponse(image_url=build_guest_background_url(request, apartment_id))
+
+
+@router.get("/guest/background/{apartment_id}", name="guest_get_background")
+def guest_get_background(
+    apartment_id: str,
+    exp: int,
+    sig: str,
+    session: Annotated[Session, Depends(get_session)],
+) -> FileResponse:
+    if exp < int(time.time()):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    if not verify_guest_background_signature(apartment_id, exp, sig):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+    apartment = session.exec(
+        select(Apartment).where(Apartment.apartment_id == apartment_id)
+    ).first()
+    if apartment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+    background_path = apartment_background_path(apartment)
+    if background_path is None or not background_path.exists() or not background_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+    media_type = mimetypes.guess_type(background_path.name)[0] or "application/octet-stream"
+    return FileResponse(
+        background_path,
+        media_type=media_type,
+        headers={"Cache-Control": "private, max-age=60"},
+    )
 
 
 @router.get("/guest/command-status/{command_id}", response_model=GuestCommandStatusResponse)

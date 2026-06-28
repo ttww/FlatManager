@@ -42,7 +42,9 @@ async function request<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const headers = new Headers(options.headers ?? {});
-  headers.set("Content-Type", "application/json");
+  if (!(options.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
   if (adminToken) {
     headers.set("X-Admin-Token", adminToken);
   }
@@ -104,6 +106,29 @@ export const api = {
     return request<void>(`/api/admin/apartments/${encodeURIComponent(apartmentId)}`, adminToken, {
       method: "DELETE",
     });
+  },
+
+  uploadApartmentGuestBackground(adminToken: string, apartmentId: string, file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request<ApartmentTimezone>(
+      `/api/admin/apartments/${encodeURIComponent(apartmentId)}/guest-background`,
+      adminToken,
+      {
+        method: "POST",
+        body: formData,
+      },
+    );
+  },
+
+  deleteApartmentGuestBackground(adminToken: string, apartmentId: string) {
+    return request<ApartmentTimezone>(
+      `/api/admin/apartments/${encodeURIComponent(apartmentId)}/guest-background`,
+      adminToken,
+      {
+        method: "DELETE",
+      },
+    );
   },
 
   getDeviceStatus(adminToken: string, apartmentId?: string) {

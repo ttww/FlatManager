@@ -10,6 +10,7 @@ import type { AccessCodeSummary, AdminDevice, ApartmentTimezone } from "../types
 type ApartmentSummary = {
   apartmentId: string;
   timezone: string;
+  hasGuestBackground: boolean;
   deviceCount: number;
   codeCount: number;
   activeCodeCount: number;
@@ -26,6 +27,7 @@ function summarizeApartments(
     byApartment.set(apartment.apartment_id, {
       apartmentId: apartment.apartment_id,
       timezone: apartment.timezone,
+      hasGuestBackground: apartment.has_guest_background ?? false,
       deviceCount: 0,
       codeCount: 0,
       activeCodeCount: 0,
@@ -65,6 +67,8 @@ export function ApartmentsPage() {
   const [editingTimezone, setEditingTimezone] = useState("UTC");
   const [savingTimezone, setSavingTimezone] = useState(false);
   const [deletingApartmentId, setDeletingApartmentId] = useState<string | null>(null);
+  const [uploadingBackgroundApartmentId, setUploadingBackgroundApartmentId] = useState<string | null>(null);
+  const [removingBackgroundApartmentId, setRemovingBackgroundApartmentId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [qrApartmentId, setQrApartmentId] = useState<string | null>(null);
 
@@ -182,6 +186,38 @@ export function ApartmentsPage() {
     }
   };
 
+  const onUploadGuestBackground = async (apartmentId: string, file: File | null) => {
+    if (!file) {
+      return;
+    }
+
+    setUploadingBackgroundApartmentId(apartmentId);
+    setMessage("");
+    try {
+      await api.uploadApartmentGuestBackground(getAdminToken(), apartmentId, file);
+      await load();
+      setMessage(`Guest background updated for ${apartmentId}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Guest background upload failed.");
+    } finally {
+      setUploadingBackgroundApartmentId(null);
+    }
+  };
+
+  const onDeleteGuestBackground = async (apartmentId: string) => {
+    setRemovingBackgroundApartmentId(apartmentId);
+    setMessage("");
+    try {
+      await api.deleteApartmentGuestBackground(getAdminToken(), apartmentId);
+      await load();
+      setMessage(`Guest background removed for ${apartmentId}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Guest background removal failed.");
+    } finally {
+      setRemovingBackgroundApartmentId(null);
+    }
+  };
+
   return (
     <section className="panel">
       <header className="panel-header">
@@ -278,15 +314,51 @@ export function ApartmentsPage() {
                       type="button"
                       onClick={() => setQrApartmentId(apartment.apartmentId)}
                       title="Show guest QR code"
-                      disabled={deletingApartmentId === apartment.apartmentId}
+                      disabled={
+                        deletingApartmentId === apartment.apartmentId ||
+                        uploadingBackgroundApartmentId === apartment.apartmentId ||
+                        removingBackgroundApartmentId === apartment.apartmentId
+                      }
                     >
                       QR Code
                     </button>
+                    <label>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={(event) =>
+                          void onUploadGuestBackground(apartment.apartmentId, event.target.files?.[0] ?? null)
+                        }
+                        disabled={
+                          deletingApartmentId === apartment.apartmentId ||
+                          uploadingBackgroundApartmentId === apartment.apartmentId ||
+                          removingBackgroundApartmentId === apartment.apartmentId
+                        }
+                      />
+                    </label>
+                    {apartment.hasGuestBackground ? (
+                      <button
+                        type="button"
+                        onClick={() => void onDeleteGuestBackground(apartment.apartmentId)}
+                        disabled={
+                          deletingApartmentId === apartment.apartmentId ||
+                          uploadingBackgroundApartmentId === apartment.apartmentId ||
+                          removingBackgroundApartmentId === apartment.apartmentId
+                        }
+                      >
+                        {removingBackgroundApartmentId === apartment.apartmentId ? "Removing image..." : "Remove Image"}
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       className="danger"
                       onClick={() => void onDeleteApartment(apartment.apartmentId)}
-                      disabled={savingTimezone || deletingApartmentId === apartment.apartmentId}
+                      disabled={
+                        savingTimezone ||
+                        deletingApartmentId === apartment.apartmentId ||
+                        uploadingBackgroundApartmentId === apartment.apartmentId ||
+                        removingBackgroundApartmentId === apartment.apartmentId
+                      }
                     >
                       {deletingApartmentId === apartment.apartmentId ? "Deleting..." : "Delete"}
                     </button>

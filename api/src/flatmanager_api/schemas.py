@@ -167,6 +167,11 @@ class AdminManualOpenResponse(BaseModel):
 class AdminApartmentTimezoneSummaryResponse(BaseModel):
     apartment_id: str
     timezone: str
+    has_guest_background: bool = False
+
+
+class GuestBackgroundUrlResponse(BaseModel):
+    image_url: str | None
 
 
 class AdminApartmentCreateRequest(BaseModel):

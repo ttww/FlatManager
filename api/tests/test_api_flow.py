@@ -100,7 +100,9 @@ def test_guest_can_read_own_command_status(tmp_path: Path) -> None:
         session.refresh(command)
 
     client = TestClient(app)
-    response = client.get(f"/api/guest/command-status/{command.id}", params={"apartment_id": "apartment-01"})
+    response = client.get(
+        f"/api/guest/command-status/{command.id}", params={"apartment_id": "apartment-01"}
+    )
 
     assert response.status_code == 200
     assert response.json() == {"status": "delivered"}
@@ -126,7 +128,9 @@ def test_guest_command_status_requires_matching_apartment(tmp_path: Path) -> Non
         session.refresh(command)
 
     client = TestClient(app)
-    response = client.get(f"/api/guest/command-status/{command.id}", params={"apartment_id": "apartment-99"})
+    response = client.get(
+        f"/api/guest/command-status/{command.id}", params={"apartment_id": "apartment-99"}
+    )
 
     assert response.status_code == 404
 
@@ -145,10 +149,8 @@ def test_guest_open_denied_invalid_code_is_neutral(tmp_path: Path) -> None:
     )
 
     assert response.status_code == 200
-    assert response.json() == {
-        "status": "denied",
-        "message": "Code invalid or not valid.",
-    }
+    assert response.json()["status"] == "denied"
+    assert response.json()["message"] == "Code invalid or not valid."
 
 
 def test_device_wait_command_requires_bearer_auth(tmp_path: Path) -> None:
@@ -247,12 +249,159 @@ def test_rate_limit_denies_after_threshold(tmp_path: Path) -> None:
     )
 
     assert first.status_code == 200
-    assert second.status_code == 200
+    assert second.status_code == 429
     assert second.json()["status"] == "denied"
 
     with Session(get_engine()) as session:
         rows = session.exec(select(AccessLog).where(AccessLog.result == "rate_limited")).all()
         assert len(rows) >= 1
+
+
+def test_trusted_ip_bypasses_guest_rate_limit(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+    previous_allowlist = settings.trusted_ip_allowlist
+    previous_ip_limit = settings.rate_limit_ip_max_attempts
+    previous_apartment_limit = settings.rate_limit_apartment_max_attempts
+
+    settings.trusted_ip_allowlist = "testclient"
+    settings.rate_limit_ip_max_attempts = 1
+    settings.rate_limit_apartment_max_attempts = 1
+
+    try:
+        with Session(get_engine()) as session:
+            _seed_access_code(session, apartment_id="apartment-01", code="123456")
+            _seed_device(session, apartment_id="apartment-01", token="device-token-1")
+
+        client = TestClient(app)
+        first = client.post(
+            "/api/guest/open",
+            json={"apartment_id": "apartment-01", "code": "000000"},
+        )
+        second = client.post(
+            "/api/guest/open",
+            json={"apartment_id": "apartment-01", "code": "000000"},
+        )
+
+        assert first.status_code == 200
+        assert second.status_code == 200
+        assert second.json()["status"] == "denied"
+    finally:
+        settings.trusted_ip_allowlist = previous_allowlist
+        settings.rate_limit_ip_max_attempts = previous_ip_limit
+        settings.rate_limit_apartment_max_attempts = previous_apartment_limit
+
+
+def test_rate_limit_isolated_per_apartment_for_same_ip(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+    settings.rate_limit_ip_max_attempts = 1
+    settings.rate_limit_apartment_max_attempts = 100
+
+    with Session(get_engine()) as session:
+        _seed_access_code(session, apartment_id="apartment-01", code="123456")
+        _seed_access_code(session, apartment_id="apartment-02", code="123456")
+        _seed_device(session, apartment_id="apartment-01", token="device-token-1")
+        _seed_device(session, apartment_id="apartment-02", token="device-token-2")
+
+    client = TestClient(app)
+
+    first_apartment_attempt = client.post(
+        "/api/guest/open",
+        json={"apartment_id": "apartment-01", "code": "000000"},
+    )
+    second_apartment_attempt = client.post(
+        "/api/guest/open",
+        json={"apartment_id": "apartment-02", "code": "000000"},
+    )
+
+    assert first_apartment_attempt.status_code == 200
+    assert second_apartment_attempt.status_code == 200
+    assert second_apartment_attempt.json()["status"] == "denied"
+
+
+def test_retry_too_fast_denies_with_429(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+    settings.guest_min_retry_failures_threshold = 1
+    settings.guest_min_retry_interval_seconds = 60
+    settings.rate_limit_ip_max_attempts = 100
+    settings.rate_limit_apartment_max_attempts = 100
+
+    with Session(get_engine()) as session:
+        _seed_access_code(session, apartment_id="apartment-01", code="123456")
+        _seed_device(session, apartment_id="apartment-01", token="device-token-1")
+
+    client = TestClient(app)
+    first = client.post(
+        "/api/guest/open",
+        json={"apartment_id": "apartment-01", "code": "000000"},
+    )
+    second = client.post(
+        "/api/guest/open",
+        json={"apartment_id": "apartment-01", "code": "000001"},
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 429
+    assert second.json()["status"] == "denied"
+
+
+def test_admin_can_upload_guest_background_and_guest_can_fetch_with_signed_url(
+    tmp_path: Path,
+) -> None:
+    _prepare_test_db(tmp_path)
+    client = TestClient(app)
+
+    apartment_response = client.post(
+        "/api/admin/apartments",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"apartment_id": "apartment-15", "timezone": "UTC"},
+    )
+    assert apartment_response.status_code == 201
+
+    upload_response = client.post(
+        "/api/admin/apartments/apartment-15/guest-background",
+        headers={"X-Admin-Token": settings.admin_token},
+        files={"file": ("bg.png", b"png-bytes", "image/png")},
+    )
+    assert upload_response.status_code == 200
+    assert upload_response.json()["has_guest_background"] is True
+
+    signed_url_response = client.get(
+        "/api/guest/background-url",
+        params={"apartment_id": "apartment-15"},
+    )
+    assert signed_url_response.status_code == 200
+    signed_url = signed_url_response.json()["image_url"]
+    assert isinstance(signed_url, str)
+    assert "/api/guest/background/apartment-15" in signed_url
+
+    image_response = client.get(signed_url)
+    assert image_response.status_code == 200
+    assert image_response.content == b"png-bytes"
+
+
+def test_guest_background_rejects_invalid_signature(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+    client = TestClient(app)
+
+    apartment_response = client.post(
+        "/api/admin/apartments",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"apartment_id": "apartment-16", "timezone": "UTC"},
+    )
+    assert apartment_response.status_code == 201
+
+    upload_response = client.post(
+        "/api/admin/apartments/apartment-16/guest-background",
+        headers={"X-Admin-Token": settings.admin_token},
+        files={"file": ("bg.png", b"png-bytes", "image/png")},
+    )
+    assert upload_response.status_code == 200
+
+    response = client.get(
+        "/api/guest/background/apartment-16",
+        params={"exp": int(datetime.now(UTC).timestamp()) + 120, "sig": "invalid"},
+    )
+    assert response.status_code == 404
 
 
 def test_admin_endpoints_require_token(tmp_path: Path) -> None:
@@ -262,6 +411,19 @@ def test_admin_endpoints_require_token(tmp_path: Path) -> None:
     response = client.get("/api/admin/devices/status")
 
     assert response.status_code == 401
+
+
+def test_trusted_ip_can_access_admin_without_token(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+    previous_allowlist = settings.trusted_ip_allowlist
+    settings.trusted_ip_allowlist = "testclient"
+
+    try:
+        client = TestClient(app)
+        response = client.get("/api/admin/devices/status")
+        assert response.status_code == 200
+    finally:
+        settings.trusted_ip_allowlist = previous_allowlist
 
 
 def test_admin_can_read_device_status(tmp_path: Path) -> None:
@@ -448,7 +610,9 @@ def test_admin_can_manage_apartment_timezone(tmp_path: Path) -> None:
         headers={"X-Admin-Token": settings.admin_token},
     )
     assert get_response.status_code == 200
-    assert get_response.json() == {"apartment_id": "apartment-05", "timezone": "UTC"}
+    assert get_response.json()["apartment_id"] == "apartment-05"
+    assert get_response.json()["timezone"] == "UTC"
+    assert get_response.json()["has_guest_background"] is False
 
     update_response = client.put(
         "/api/admin/apartments/apartment-05/timezone",
@@ -456,14 +620,22 @@ def test_admin_can_manage_apartment_timezone(tmp_path: Path) -> None:
         json={"timezone": "Europe/Berlin"},
     )
     assert update_response.status_code == 200
-    assert update_response.json() == {"apartment_id": "apartment-05", "timezone": "Europe/Berlin"}
+    assert update_response.json()["apartment_id"] == "apartment-05"
+    assert update_response.json()["timezone"] == "Europe/Berlin"
+    assert update_response.json()["has_guest_background"] is False
 
     list_response = client.get(
         "/api/admin/apartments?apartment_id=apartment-05",
         headers={"X-Admin-Token": settings.admin_token},
     )
     assert list_response.status_code == 200
-    assert list_response.json() == [{"apartment_id": "apartment-05", "timezone": "Europe/Berlin"}]
+    assert list_response.json() == [
+        {
+            "apartment_id": "apartment-05",
+            "timezone": "Europe/Berlin",
+            "has_guest_background": False,
+        }
+    ]
 
 
 def test_admin_rejects_invalid_apartment_timezone(tmp_path: Path) -> None:
