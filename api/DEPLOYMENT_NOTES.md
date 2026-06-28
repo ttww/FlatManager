@@ -32,6 +32,7 @@ location /api/device/wait-command {
 - Confirm TLS certificates renew before expiration.
 - Confirm admin token and security pepper are set from environment, not defaults.
 - Confirm `LOGGING_TIMEZONE` is set explicitly (for example `UTC` or `Europe/Berlin`) so runtime and migration logs match operational expectations.
+- Confirm API shutdown does not hang on long-poll connections. The container runs uvicorn with `--timeout-graceful-shutdown 2` to avoid waiting on full long-poll timeouts during stop/restart.
 
 ## Recommended production hardening
 
