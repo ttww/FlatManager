@@ -5,7 +5,7 @@ import { api } from "../lib/api";
 import { getAdminToken } from "../lib/session";
 import type { ApartmentTimezone } from "../types";
 
-const ADMIN_UI_VERSION = import.meta.env.VITE_APP_VERSION ?? "0.0.0";
+const ADMIN_UI_VERSION = __APP_VERSION__;
 
 export function SupportPage() {
   const [apartmentId, setApartmentId] = useState("");

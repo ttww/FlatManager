@@ -22,7 +22,14 @@ Optional environment variable:
 VITE_API_BASE_URL=http://127.0.0.1:8000
 ```
 
+Optional release version override:
+
+```bash
+VITE_APP_VERSION=1.2.3
+```
+
 If omitted, the app defaults to `http://127.0.0.1:8000`.
+If `VITE_APP_VERSION` is not set, the UI version label uses `package.json` version.
 
 ## Run
 
