@@ -63,6 +63,11 @@ async function request<T>(
   }
 
   if (!response.ok) {
+    if (response.status === 413) {
+      throw new Error(
+        "Upload rejected by reverse proxy (413 Request Entity Too Large). Increase NGINX client_max_body_size or use a smaller image.",
+      );
+    }
     const detail = await response.text();
     throw new Error(detail || `Request failed (${response.status})`);
   }

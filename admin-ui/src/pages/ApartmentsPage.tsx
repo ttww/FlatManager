@@ -16,6 +16,8 @@ type ApartmentSummary = {
   activeCodeCount: number;
 };
 
+const MAX_GUEST_BACKGROUND_BYTES = 5 * 1024 * 1024;
+
 function summarizeApartments(
   apartments: ApartmentTimezone[],
   devices: AdminDevice[],
@@ -188,6 +190,11 @@ export function ApartmentsPage() {
 
   const onUploadGuestBackground = async (apartmentId: string, file: File | null) => {
     if (!file) {
+      return;
+    }
+
+    if (file.size > MAX_GUEST_BACKGROUND_BYTES) {
+      setMessage("Image is too large. Maximum allowed size is 5 MB.");
       return;
     }
 

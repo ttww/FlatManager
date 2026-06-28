@@ -19,6 +19,22 @@ location /api/device/wait-command {
 }
 ```
 
+## Upload size limit for apartment background images
+
+If you upload guest background images through a reverse proxy, increase NGINX request body size above the API limit (default 5 MB):
+
+```nginx
+server {
+    client_max_body_size 6m;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+    }
+}
+```
+
+Without this setting, NGINX may return `413 Request Entity Too Large` before the request reaches FastAPI.
+
 ## Why these settings matter
 
 - `proxy_read_timeout` must be higher than API long-poll timeout.
