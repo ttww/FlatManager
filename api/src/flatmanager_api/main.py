@@ -5,7 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import models  # noqa: F401
 from .api_routes import router as api_router
 from .db import init_db
+from .logging_config import configure_logging
 from .settings import settings
+
+configure_logging(settings.logging_timezone)
 
 app = FastAPI(
     title=settings.app_name,

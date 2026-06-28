@@ -2,7 +2,7 @@ import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 
 import { api } from "../lib/api";
-import { formatDateTime, statusClass } from "../lib/format";
+import { formatDateTime, getDisplayTimezone, statusClass, type TimezoneDisplayMode } from "../lib/format";
 import { getAdminToken } from "../lib/session";
 import type { AccessCodeForm, AccessCodeSummary } from "../types";
 
@@ -16,7 +16,12 @@ const initialForm: AccessCodeForm = {
   guest_name: "",
 };
 
-export function CodesPage() {
+type CodesPageProps = {
+  timezoneDisplayMode: TimezoneDisplayMode;
+  browserTimezone: string;
+};
+
+export function CodesPage({ timezoneDisplayMode, browserTimezone }: CodesPageProps) {
   const [form, setForm] = useState<AccessCodeForm>(initialForm);
   const [codes, setCodes] = useState<AccessCodeSummary[]>([]);
   const [apartmentIds, setApartmentIds] = useState<string[]>([]);
@@ -113,6 +118,9 @@ export function CodesPage() {
       setResult(error instanceof Error ? error.message : "Delete failed.");
     }
   };
+
+  const displayTimezone = (apartmentTimezone: string) =>
+    getDisplayTimezone(timezoneDisplayMode, apartmentTimezone, browserTimezone);
 
   return (
     <section className="panel">
@@ -246,8 +254,8 @@ export function CodesPage() {
                   </span>
                 </td>
                 <td>{code.used_count}/{code.max_uses}</td>
-                <td>{formatDateTime(code.valid_from, code.apartment_timezone)}</td>
-                <td>{formatDateTime(code.valid_until, code.apartment_timezone)}</td>
+                <td>{formatDateTime(code.valid_from, displayTimezone(code.apartment_timezone))}</td>
+                <td>{formatDateTime(code.valid_until, displayTimezone(code.apartment_timezone))}</td>
                 <td>{code.booking_reference ?? "-"}</td>
                 <td>{code.guest_name ?? "-"}</td>
                 <td>

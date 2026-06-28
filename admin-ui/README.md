@@ -42,6 +42,12 @@ npm run build
 - Protected routes redirect to `/login` when token is missing.
 - Logout clears local session token.
 
+## Timezone display
+
+- Admin timestamp tables default to browser-local timezone.
+- A global toggle in the admin shell switches between `Local` and `Apartment` timezone display.
+- Toggle preference is stored in localStorage.
+
 ## Implemented routes
 
 - `/login`

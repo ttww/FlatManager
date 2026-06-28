@@ -1,6 +1,8 @@
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -11,6 +13,7 @@ class Settings(BaseSettings):
     app_name: str = Field(default="FlatManager API")
     app_env: str = Field(default="development")
     app_debug: bool = Field(default=True)
+    logging_timezone: str = Field(default="UTC")
 
     host: str = Field(default="127.0.0.1")
     port: int = Field(default=8000)
@@ -55,6 +58,17 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
     )
+
+    @field_validator("logging_timezone")
+    @classmethod
+    def validate_logging_timezone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except ZoneInfoNotFoundError as error:
+            raise ValueError(
+                f"Invalid logging timezone '{value}'. Use IANA names like Europe/Berlin."
+            ) from error
+        return value
 
 
 settings = Settings()

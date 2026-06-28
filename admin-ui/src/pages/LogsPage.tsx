@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../lib/api";
-import { formatDateTime, statusClass } from "../lib/format";
+import { formatDateTime, getDisplayTimezone, statusClass, type TimezoneDisplayMode } from "../lib/format";
 import { getAdminToken } from "../lib/session";
 import type { AccessLogSummary } from "../types";
 
-export function LogsPage() {
+type LogsPageProps = {
+  timezoneDisplayMode: TimezoneDisplayMode;
+  browserTimezone: string;
+};
+
+export function LogsPage({ timezoneDisplayMode, browserTimezone }: LogsPageProps) {
   const [rows, setRows] = useState<AccessLogSummary[]>([]);
   const [message, setMessage] = useState("");
   const [clearing, setClearing] = useState(false);
@@ -31,6 +36,9 @@ export function LogsPage() {
       setClearing(false);
     }
   };
+
+  const displayTimezone = (apartmentTimezone: string) =>
+    getDisplayTimezone(timezoneDisplayMode, apartmentTimezone, browserTimezone);
 
   return (
     <section className="panel">
@@ -63,7 +71,7 @@ export function LogsPage() {
           <tbody>
             {rows.map((row) => (
               <tr key={row.id}>
-                <td>{formatDateTime(row.timestamp, row.apartment_timezone)}</td>
+                <td>{formatDateTime(row.timestamp, displayTimezone(row.apartment_timezone))}</td>
                 <td>{row.apartment_id}</td>
                 <td>
                   <span className={`status-pill ${statusClass(row.result)}`}>{row.result}</span>

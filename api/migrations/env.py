@@ -13,6 +13,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from flatmanager_api.models import SQLModel  # noqa: E402
+from flatmanager_api.logging_config import configure_logging  # noqa: E402
 from flatmanager_api.settings import settings  # noqa: E402
 
 # this is the Alembic Config object, which provides
@@ -23,6 +24,7 @@ config = context.config
 # This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+configure_logging(settings.logging_timezone)
 
 # add your model's MetaData object here
 # for 'autogenerate' support

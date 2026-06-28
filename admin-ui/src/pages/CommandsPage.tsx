@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
 
 import { api } from "../lib/api";
-import { formatDateTime, statusClass } from "../lib/format";
+import { formatDateTime, getDisplayTimezone, statusClass, type TimezoneDisplayMode } from "../lib/format";
 import { getAdminToken } from "../lib/session";
 import type { CommandSummary } from "../types";
 
-export function CommandsPage() {
+type CommandsPageProps = {
+  timezoneDisplayMode: TimezoneDisplayMode;
+  browserTimezone: string;
+};
+
+export function CommandsPage({ timezoneDisplayMode, browserTimezone }: CommandsPageProps) {
   const [rows, setRows] = useState<CommandSummary[]>([]);
   const [message, setMessage] = useState("");
   const [clearing, setClearing] = useState(false);
@@ -31,6 +36,9 @@ export function CommandsPage() {
       setClearing(false);
     }
   };
+
+  const displayTimezone = (apartmentTimezone: string) =>
+    getDisplayTimezone(timezoneDisplayMode, apartmentTimezone, browserTimezone);
 
   return (
     <section className="panel">
@@ -69,9 +77,9 @@ export function CommandsPage() {
                 <td>
                   <span className={`status-pill ${statusClass(row.status)}`}>{row.status}</span>
                 </td>
-                <td>{formatDateTime(row.created_at, row.apartment_timezone)}</td>
-                <td>{formatDateTime(row.expires_at, row.apartment_timezone)}</td>
-                <td>{formatDateTime(row.acknowledged_at, row.apartment_timezone)}</td>
+                <td>{formatDateTime(row.created_at, displayTimezone(row.apartment_timezone))}</td>
+                <td>{formatDateTime(row.expires_at, displayTimezone(row.apartment_timezone))}</td>
+                <td>{formatDateTime(row.acknowledged_at, displayTimezone(row.apartment_timezone))}</td>
               </tr>
             ))}
           </tbody>

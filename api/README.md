@@ -14,10 +14,20 @@ Backend implementation using uv, FastAPI, SQLModel, and Alembic.
 2. Copy environment template:
    cp .env.example .env
 
+Key timezone settings:
+- `LOGGING_TIMEZONE` controls log timestamp timezone (IANA name, default `UTC`).
+- Stored API data timestamps remain UTC regardless of logging timezone.
+
 ## Run (development)
 
 - Start API with auto-reload:
   uv run flatmanager-api
+
+Example with non-UTC log timestamps:
+
+```bash
+LOGGING_TIMEZONE=Europe/Berlin uv run flatmanager-api
+```
 
 ## Checks
 

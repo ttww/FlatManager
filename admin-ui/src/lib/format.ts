@@ -1,3 +1,5 @@
+export type TimezoneDisplayMode = "local" | "apartment";
+
 export function formatDateTime(input: string | null, timezone = "UTC"): string {
   if (!input) return "-";
   const date = new Date(input);
@@ -24,6 +26,23 @@ export function formatDateTime(input: string | null, timezone = "UTC"): string {
       second: "2-digit",
     }).format(date);
   }
+}
+
+export function getBrowserTimezone(): string {
+  try {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return timezone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
+export function getDisplayTimezone(
+  mode: TimezoneDisplayMode,
+  apartmentTimezone: string,
+  browserTimezone: string,
+): string {
+  return mode === "apartment" ? apartmentTimezone : browserTimezone;
 }
 
 export function statusClass(status: string): string {

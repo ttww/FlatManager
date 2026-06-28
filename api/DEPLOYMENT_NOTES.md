@@ -31,6 +31,7 @@ location /api/device/wait-command {
 - Confirm command delivery latency stays low under expected load.
 - Confirm TLS certificates renew before expiration.
 - Confirm admin token and security pepper are set from environment, not defaults.
+- Confirm `LOGGING_TIMEZONE` is set explicitly (for example `UTC` or `Europe/Berlin`) so runtime and migration logs match operational expectations.
 
 ## Recommended production hardening
 

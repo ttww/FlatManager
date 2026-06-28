@@ -3,12 +3,17 @@ import { useEffect, useState } from "react";
 
 import { QrModal } from "../components/QrModal";
 import { api } from "../lib/api";
-import { formatDateTime, statusClass } from "../lib/format";
+import { formatDateTime, getDisplayTimezone, statusClass, type TimezoneDisplayMode } from "../lib/format";
 import { guestUrl } from "../lib/guestUrl";
 import { getAdminToken } from "../lib/session";
 import type { AdminDevice, ApartmentTimezone, NewDeviceResponse, RotateDeviceTokenResponse } from "../types";
 
-export function DevicesPage() {
+type DevicesPageProps = {
+  timezoneDisplayMode: TimezoneDisplayMode;
+  browserTimezone: string;
+};
+
+export function DevicesPage({ timezoneDisplayMode, browserTimezone }: DevicesPageProps) {
   const [devices, setDevices] = useState<AdminDevice[]>([]);
   const [apartmentIds, setApartmentIds] = useState<string[]>([]);
   const [apartmentId, setApartmentId] = useState("");
@@ -120,6 +125,9 @@ export function DevicesPage() {
     }
   };
 
+  const displayTimezone = (apartmentTimezone: string) =>
+    getDisplayTimezone(timezoneDisplayMode, apartmentTimezone, browserTimezone);
+
   return (
     <section className="panel">
       <header className="panel-header">
@@ -209,7 +217,7 @@ export function DevicesPage() {
                 <td>
                   <span className={`status-pill ${statusClass(device.status)}`}>{device.status}</span>
                 </td>
-                <td>{formatDateTime(device.last_seen, device.apartment_timezone)}</td>
+                <td>{formatDateTime(device.last_seen, displayTimezone(device.apartment_timezone))}</td>
                 <td>
                   <div className="row-actions">
                     {editingDeviceId === device.id ? (
