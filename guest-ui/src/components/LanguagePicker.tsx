@@ -1,5 +1,25 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
+import {
+  CN,
+  CZ,
+  DE,
+  ES,
+  FR,
+  GB,
+  GR,
+  HU,
+  IL,
+  IN,
+  JP,
+  KR,
+  PL,
+  PT,
+  RU,
+  SA,
+  UA,
+} from "country-flag-icons/react/3x2";
+
 import type { Locale } from "../i18n/messages";
 
 export type LocaleOption = {
@@ -13,6 +33,71 @@ type LanguagePickerProps = {
   options: LocaleOption[];
   onChange: (value: Locale) => void;
 };
+
+type FlagComponent = typeof SA;
+
+const countryFlagByLocale: Partial<Record<Locale, FlagComponent>> = {
+  ar: SA,
+  cs: CZ,
+  de: DE,
+  el: GR,
+  en: GB,
+  es: ES,
+  fr: FR,
+  he: IL,
+  hi: IN,
+  hu: HU,
+  ja: JP,
+  ko: KR,
+  pl: PL,
+  pt: PT,
+  ru: RU,
+  uk: UA,
+  zh: CN,
+};
+
+function splitOptionLabel(option: LocaleOption) {
+  const iconMatch = option.label.match(/^\S+\s+/u);
+  const icon = iconMatch ? iconMatch[0].trim() : "";
+  const text = option.label.replace(/^\S+\s+/u, "");
+
+  return {
+    icon,
+    text: text || option.label,
+  };
+}
+
+function LocaleLabel({ option }: { option: LocaleOption }) {
+  const CountryFlag = countryFlagByLocale[option.value];
+
+  if (CountryFlag) {
+    const { text } = splitOptionLabel(option);
+
+    return (
+      <span className="language-picker-option-main">
+        <span className="language-picker-flag" aria-hidden="true">
+          <CountryFlag title={text} />
+        </span>
+        <span className="language-picker-option-label">{text}</span>
+      </span>
+    );
+  }
+
+  const { icon, text } = splitOptionLabel(option);
+
+  if (icon) {
+    return (
+      <span className="language-picker-option-main">
+        <span className="language-picker-emoji-flag" aria-hidden="true">
+          {icon}
+        </span>
+        <span className="language-picker-option-label">{text}</span>
+      </span>
+    );
+  }
+
+  return <span className="language-picker-option-label">{option.label}</span>;
+}
 
 export function LanguagePicker({ label, value, options, onChange }: LanguagePickerProps) {
   const listboxId = useId();
@@ -126,7 +211,9 @@ export function LanguagePicker({ label, value, options, onChange }: LanguagePick
             }
           }}
         >
-          <span className="language-picker-trigger-label">{selectedOption?.label ?? value}</span>
+          <span className="language-picker-trigger-label">
+            {selectedOption ? <LocaleLabel option={selectedOption} /> : value}
+          </span>
           <span className="language-picker-trigger-caret" aria-hidden="true">
             ▾
           </span>
@@ -175,7 +262,7 @@ export function LanguagePicker({ label, value, options, onChange }: LanguagePick
                   }
                 }}
               >
-                <span className="language-picker-option-label">{option.label}</span>
+                <LocaleLabel option={option} />
                 {option.value === value ? <span aria-hidden="true">✓</span> : null}
               </button>
             ))}
