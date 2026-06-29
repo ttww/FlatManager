@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { LanguagePicker } from "../components/LanguagePicker";
 import { localeMeta, localeOptions, messages, type Locale } from "../i18n/messages";
 import { fetchGuestBackgroundUrl, fetchGuestCommandStatus, GuestApiError, requestDoorOpen } from "../lib/api";
 import { trackEvent } from "../lib/tracking";
@@ -274,16 +275,7 @@ export function GuestOpenPage() {
             <p className="subtitle">{t.subtitle}</p>
           </div>
 
-          <label className="language-picker" htmlFor="locale">
-            <span>{t.language}</span>
-            <select id="locale" value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>
-              {localeOptions.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <LanguagePicker label={t.language} value={locale} options={localeOptions} onChange={setLocale} />
         </div>
 
         <form onSubmit={onSubmit} className="guest-form">
