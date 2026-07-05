@@ -37,89 +37,43 @@ def _ensure_schema_compatibility(engine) -> None:
     if "apartments" not in table_names:
         return
 
-    column_names = {
-        column_info["name"] for column_info in inspector.get_columns("apartments")
-    }
+    column_names = {column_info["name"] for column_info in inspector.get_columns("apartments")}
 
     with engine.begin() as connection:
         if "guest_background_filename" not in column_names:
             connection.execute(
-                text(
-                    "ALTER TABLE apartments "
-                    "ADD COLUMN guest_background_filename VARCHAR(255)"
-                )
+                text("ALTER TABLE apartments ADD COLUMN guest_background_filename VARCHAR(255)")
             )
 
         if "guest_background_updated_at" not in column_names:
             connection.execute(
-                text(
-                    "ALTER TABLE apartments "
-                    "ADD COLUMN guest_background_updated_at DATETIME"
-                )
+                text("ALTER TABLE apartments ADD COLUMN guest_background_updated_at DATETIME")
             )
 
         if "address_line1" not in column_names:
-            connection.execute(
-                text(
-                    "ALTER TABLE apartments "
-                    "ADD COLUMN address_line1 VARCHAR(160)"
-                )
-            )
+            connection.execute(text("ALTER TABLE apartments ADD COLUMN address_line1 VARCHAR(160)"))
 
         if "address_line2" not in column_names:
-            connection.execute(
-                text(
-                    "ALTER TABLE apartments "
-                    "ADD COLUMN address_line2 VARCHAR(160)"
-                )
-            )
+            connection.execute(text("ALTER TABLE apartments ADD COLUMN address_line2 VARCHAR(160)"))
 
         if "postal_code" not in column_names:
-            connection.execute(
-                text(
-                    "ALTER TABLE apartments "
-                    "ADD COLUMN postal_code VARCHAR(32)"
-                )
-            )
+            connection.execute(text("ALTER TABLE apartments ADD COLUMN postal_code VARCHAR(32)"))
 
         if "city" not in column_names:
-            connection.execute(
-                text(
-                    "ALTER TABLE apartments "
-                    "ADD COLUMN city VARCHAR(120)"
-                )
-            )
+            connection.execute(text("ALTER TABLE apartments ADD COLUMN city VARCHAR(120)"))
 
         if "country_code" not in column_names:
-            connection.execute(
-                text(
-                    "ALTER TABLE apartments "
-                    "ADD COLUMN country_code VARCHAR(2)"
-                )
-            )
+            connection.execute(text("ALTER TABLE apartments ADD COLUMN country_code VARCHAR(2)"))
 
         if "latitude" not in column_names:
-            connection.execute(
-                text(
-                    "ALTER TABLE apartments "
-                    "ADD COLUMN latitude FLOAT"
-                )
-            )
+            connection.execute(text("ALTER TABLE apartments ADD COLUMN latitude FLOAT"))
 
         if "longitude" not in column_names:
-            connection.execute(
-                text(
-                    "ALTER TABLE apartments "
-                    "ADD COLUMN longitude FLOAT"
-                )
-            )
+            connection.execute(text("ALTER TABLE apartments ADD COLUMN longitude FLOAT"))
 
         if "guest_background_image_id" not in column_names:
             connection.execute(
-                text(
-                    "ALTER TABLE apartments "
-                    "ADD COLUMN guest_background_image_id INTEGER"
-                )
+                text("ALTER TABLE apartments ADD COLUMN guest_background_image_id INTEGER")
             )
 
     if "apartment_images" not in table_names:
@@ -150,10 +104,7 @@ def _ensure_schema_compatibility(engine) -> None:
                 )
             )
             connection.execute(
-                text(
-                    "CREATE INDEX ix_apartment_images_sort_order "
-                    "ON apartment_images(sort_order)"
-                )
+                text("CREATE INDEX ix_apartment_images_sort_order ON apartment_images(sort_order)")
             )
 
 

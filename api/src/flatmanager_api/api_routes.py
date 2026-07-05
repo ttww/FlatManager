@@ -788,9 +788,7 @@ def admin_get_apartment_image_file(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
 
     media_type = (
-        image.content_type
-        or mimetypes.guess_type(image_path.name)[0]
-        or "application/octet-stream"
+        image.content_type or mimetypes.guess_type(image_path.name)[0] or "application/octet-stream"
     )
     return FileResponse(image_path, media_type=media_type)
 

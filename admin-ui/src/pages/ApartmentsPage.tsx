@@ -6,11 +6,11 @@ import { api } from "../lib/api";
 import { guestUrl } from "../lib/guestUrl";
 import { getAdminToken } from "../lib/session";
 import type {
-  AccessCodeSummary,
-  AdminDevice,
-  ApartmentImage,
-  ApartmentTimezone,
-  ApartmentUpdatePayload,
+    AccessCodeSummary,
+    AdminDevice,
+    ApartmentImage,
+    ApartmentTimezone,
+    ApartmentUpdatePayload,
 } from "../types";
 
 type ApartmentSummary = {
