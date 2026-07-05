@@ -3,7 +3,9 @@ import type {
     AccessCodeSummary,
     AccessLogSummary,
     AdminDevice,
+  ApartmentImage,
     ApartmentTimezone,
+  ApartmentUpdatePayload,
     CommandSummary,
     DeviceStatus,
     DeviceUpdatePayload,
@@ -85,7 +87,20 @@ export const api = {
     return request<ApartmentTimezone[]>(`/api/admin/apartments${query}`, adminToken);
   },
 
-  createApartment(adminToken: string, payload: { apartment_id: string; timezone: string }) {
+  createApartment(
+    adminToken: string,
+    payload: {
+      apartment_id: string;
+      timezone: string;
+      address_line1?: string | null;
+      address_line2?: string | null;
+      postal_code?: string | null;
+      city?: string | null;
+      country_code?: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
+    },
+  ) {
     return request<ApartmentTimezone>("/api/admin/apartments", adminToken, {
       method: "POST",
       body: JSON.stringify(payload),
@@ -103,6 +118,17 @@ export const api = {
       {
         method: "PUT",
         body: JSON.stringify({ timezone }),
+      },
+    );
+  },
+
+  updateApartment(adminToken: string, apartmentId: string, payload: ApartmentUpdatePayload) {
+    return request<ApartmentTimezone>(
+      `/api/admin/apartments/${encodeURIComponent(apartmentId)}`,
+      adminToken,
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
       },
     );
   },
@@ -133,6 +159,57 @@ export const api = {
       {
         method: "DELETE",
       },
+    );
+  },
+
+  listApartmentImages(adminToken: string, apartmentId: string) {
+    return request<ApartmentImage[]>(
+      `/api/admin/apartments/${encodeURIComponent(apartmentId)}/images`,
+      adminToken,
+    );
+  },
+
+  uploadApartmentImage(adminToken: string, apartmentId: string, file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request<ApartmentImage>(
+      `/api/admin/apartments/${encodeURIComponent(apartmentId)}/images`,
+      adminToken,
+      {
+        method: "POST",
+        body: formData,
+      },
+    );
+  },
+
+  reorderApartmentImages(
+    adminToken: string,
+    apartmentId: string,
+    items: Array<{ image_id: number; sort_order: number }>,
+  ) {
+    return request<ApartmentImage[]>(
+      `/api/admin/apartments/${encodeURIComponent(apartmentId)}/images/reorder`,
+      adminToken,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ items }),
+      },
+    );
+  },
+
+  setApartmentGuestBackgroundImage(adminToken: string, apartmentId: string, imageId: number) {
+    return request<ApartmentTimezone>(
+      `/api/admin/apartments/${encodeURIComponent(apartmentId)}/images/${imageId}/set-guest-background`,
+      adminToken,
+      { method: "POST" },
+    );
+  },
+
+  deleteApartmentImage(adminToken: string, apartmentId: string, imageId: number) {
+    return request<void>(
+      `/api/admin/apartments/${encodeURIComponent(apartmentId)}/images/${imageId}`,
+      adminToken,
+      { method: "DELETE" },
     );
   },
 

@@ -15,8 +15,31 @@ class Apartment(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     apartment_id: str = Field(unique=True, index=True, max_length=100)
     timezone: str = Field(default="UTC", max_length=100)
+    address_line1: str | None = Field(default=None, max_length=160)
+    address_line2: str | None = Field(default=None, max_length=160)
+    postal_code: str | None = Field(default=None, max_length=32)
+    city: str | None = Field(default=None, max_length=120)
+    country_code: str | None = Field(default=None, max_length=2)
+    latitude: float | None = Field(default=None)
+    longitude: float | None = Field(default=None)
     guest_background_filename: str | None = Field(default=None, max_length=255)
+    guest_background_image_id: int | None = Field(default=None, foreign_key="apartment_images.id")
     guest_background_updated_at: datetime | None = Field(default=None)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class ApartmentImage(SQLModel, table=True):
+    __tablename__ = "apartment_images"
+
+    id: int | None = Field(default=None, primary_key=True)
+    apartment_id: str = Field(foreign_key="apartments.apartment_id", index=True, max_length=100)
+    storage_filename: str = Field(unique=True, index=True, max_length=255)
+    original_filename: str = Field(max_length=255)
+    content_type: str = Field(max_length=64)
+    byte_size: int = Field(default=0)
+    sha256: str = Field(max_length=64)
+    sort_order: int = Field(default=0, index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

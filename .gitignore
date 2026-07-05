@@ -1,4 +1,5 @@
 Scratch.md
+.DS_Store
 /esp/.pio
 api/data/flatmanager.db
 api/.env
@@ -7,4 +8,5 @@ esp/compile_commands.json
 docs/node_modules/
 *.pyc
 /api/data/guest-backgrounds
+/api/data/apartment-gallery
 /pcb

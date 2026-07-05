@@ -18,6 +18,10 @@ Key timezone settings:
 - `LOGGING_TIMEZONE` controls log timestamp timezone (IANA name, default `UTC`).
 - Stored API data timestamps remain UTC regardless of logging timezone.
 
+Gallery settings:
+- `APARTMENT_GALLERY_DIR` controls where apartment gallery files are stored.
+- `APARTMENT_GALLERY_MAX_IMAGES` limits images per apartment (default `20`).
+
 ## Run (development)
 
 - Start API with auto-reload:
@@ -39,16 +43,81 @@ LOGGING_TIMEZONE=Europe/Berlin uv run flatmanager-api
 ## Implemented endpoints
 
 - GET /health
+- GET /api/admin/apartments
+- GET /api/admin/apartments/{apartment_id}
+- POST /api/admin/apartments
+- PUT /api/admin/apartments/{apartment_id}/timezone
+- PATCH /api/admin/apartments/{apartment_id}
+- DELETE /api/admin/apartments/{apartment_id}
+- POST /api/admin/apartments/{apartment_id}/guest-background
+- DELETE /api/admin/apartments/{apartment_id}/guest-background
+- GET /api/admin/apartments/{apartment_id}/images
+- POST /api/admin/apartments/{apartment_id}/images
+- GET /api/admin/apartments/{apartment_id}/images/{image_id}/file
+- PATCH /api/admin/apartments/{apartment_id}/images/reorder
+- POST /api/admin/apartments/{apartment_id}/images/{image_id}/set-guest-background
+- DELETE /api/admin/apartments/{apartment_id}/images/{image_id}
 - POST /api/guest/open
+- GET /api/guest/background-url
+- GET /api/guest/background/{apartment_id}
+- GET /api/guest/command-status/{command_id}
 - GET /api/device/wait-command
 - POST /api/device/command-result
 - POST /api/admin/devices
 - GET /api/admin/devices
 - POST /api/admin/devices/{device_id}/rotate-token
+- PATCH /api/admin/devices/{device_id}
 - DELETE /api/admin/devices/{device_id}
 - GET /api/admin/devices/status
 - GET /api/admin/commands/recent
+- DELETE /api/admin/commands
+- POST /api/admin/commands/manual-open
 - GET /api/admin/access-logs/recent
+- DELETE /api/admin/access-logs
+- GET /api/admin/access-codes
+- POST /api/admin/access-codes
+- PATCH /api/admin/access-codes/{code_id}
+- POST /api/admin/access-codes/{code_id}/deactivate
+- DELETE /api/admin/access-codes/{code_id}
+
+## Apartment metadata and gallery notes
+
+- Apartment resources now support address and geo-location fields:
+  - `address_line1`, `address_line2`, `postal_code`, `city`, `country_code`
+  - `latitude`, `longitude`
+- Guest background can be selected from apartment gallery images.
+- Gallery images are validated as JPG/PNG/WEBP and limited by:
+  - `GUEST_BACKGROUND_MAX_BYTES`
+  - `APARTMENT_GALLERY_MAX_IMAGES`
+
+Example: update apartment metadata
+
+```bash
+curl -s -X PATCH "http://127.0.0.1:8000/api/admin/apartments/apartment-01" \
+  -H "X-Admin-Token: flatmanager-admin-dev-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "address_line1": "Main Street 1",
+    "postal_code": "10115",
+    "city": "Berlin",
+    "country_code": "DE",
+    "latitude": 52.53,
+    "longitude": 13.38
+  }'
+```
+
+Example: upload apartment gallery image and set it as guest background
+
+```bash
+# upload
+curl -s -X POST "http://127.0.0.1:8000/api/admin/apartments/apartment-01/images" \
+  -H "X-Admin-Token: flatmanager-admin-dev-token" \
+  -F "file=@./example.jpg"
+
+# set uploaded image id as guest background
+curl -s -X POST "http://127.0.0.1:8000/api/admin/apartments/apartment-01/images/1/set-guest-background" \
+  -H "X-Admin-Token: flatmanager-admin-dev-token"
+```
 
 ## Example: Device provisioning flow
 

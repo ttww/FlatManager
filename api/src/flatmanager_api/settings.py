@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     guest_backgrounds_dir: str = Field(default="./data/guest-backgrounds")
     guest_background_max_bytes: int = Field(default=5 * 1024 * 1024)
     guest_background_url_ttl_seconds: int = Field(default=120)
+    apartment_gallery_dir: str = Field(default="./data/apartment-gallery")
+    apartment_gallery_max_images: int = Field(default=20)
 
     trusted_ip_allowlist: str = Field(default="109.90.33.191")
 

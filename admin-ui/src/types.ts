@@ -95,5 +95,38 @@ export type AccessCodeSummary = {
 export type ApartmentTimezone = {
   apartment_id: string;
   timezone: string;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  postal_code?: string | null;
+  city?: string | null;
+  country_code?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   has_guest_background?: boolean;
+  guest_background_image_id?: number | null;
+  gallery_count?: number;
+};
+
+export type ApartmentImage = {
+  id: number;
+  apartment_id: string;
+  original_filename: string;
+  content_type: string;
+  byte_size: number;
+  sort_order: number;
+  image_url: string;
+  is_guest_background: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ApartmentUpdatePayload = {
+  timezone?: string;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  postal_code?: string | null;
+  city?: string | null;
+  country_code?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 };

@@ -173,7 +173,16 @@ class AdminManualOpenResponse(BaseModel):
 class AdminApartmentTimezoneSummaryResponse(BaseModel):
     apartment_id: str
     timezone: str
+    address_line1: str | None = None
+    address_line2: str | None = None
+    postal_code: str | None = None
+    city: str | None = None
+    country_code: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
     has_guest_background: bool = False
+    guest_background_image_id: int | None = None
+    gallery_count: int = 0
 
 
 class GuestBackgroundUrlResponse(BaseModel):
@@ -183,7 +192,47 @@ class GuestBackgroundUrlResponse(BaseModel):
 class AdminApartmentCreateRequest(BaseModel):
     apartment_id: str = Field(min_length=1, max_length=100)
     timezone: str = Field(default="UTC", min_length=1, max_length=100)
+    address_line1: str | None = Field(default=None, max_length=160)
+    address_line2: str | None = Field(default=None, max_length=160)
+    postal_code: str | None = Field(default=None, max_length=32)
+    city: str | None = Field(default=None, max_length=120)
+    country_code: str | None = Field(default=None, min_length=2, max_length=2)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
 
 
 class AdminApartmentTimezoneUpdateRequest(BaseModel):
     timezone: str = Field(min_length=1, max_length=100)
+
+
+class AdminApartmentUpdateRequest(BaseModel):
+    timezone: str | None = Field(default=None, min_length=1, max_length=100)
+    address_line1: str | None = Field(default=None, max_length=160)
+    address_line2: str | None = Field(default=None, max_length=160)
+    postal_code: str | None = Field(default=None, max_length=32)
+    city: str | None = Field(default=None, max_length=120)
+    country_code: str | None = Field(default=None, min_length=2, max_length=2)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+
+
+class ApartmentImageSummaryResponse(BaseModel):
+    id: int
+    apartment_id: str
+    original_filename: str
+    content_type: str
+    byte_size: int
+    sort_order: int
+    image_url: str
+    is_guest_background: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class ApartmentImageReorderEntry(BaseModel):
+    image_id: int
+    sort_order: int = Field(ge=0, le=100000)
+
+
+class ApartmentImageReorderRequest(BaseModel):
+    items: list[ApartmentImageReorderEntry] = Field(min_length=1, max_length=200)

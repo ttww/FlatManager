@@ -18,7 +18,7 @@ from sqlmodel import Session, select
 
 from .db import get_session
 from .device_queue import get_queue_manager
-from .models import AccessCode, AccessLog, Apartment, Device, DoorCommand
+from .models import AccessCode, AccessLog, Apartment, ApartmentImage, Device, DoorCommand
 from .schemas import (
     AccessLogSummaryResponse,
     AdminAccessCodeCreateRequest,
@@ -27,6 +27,7 @@ from .schemas import (
     AdminApartmentCreateRequest,
     AdminApartmentTimezoneSummaryResponse,
     AdminApartmentTimezoneUpdateRequest,
+    AdminApartmentUpdateRequest,
     AdminDeviceCreateRequest,
     AdminDeviceCreateResponse,
     AdminDeviceSummaryResponse,
@@ -34,6 +35,8 @@ from .schemas import (
     AdminManualOpenRequest,
     AdminManualOpenResponse,
     AdminRotateTokenResponse,
+    ApartmentImageReorderRequest,
+    ApartmentImageSummaryResponse,
     CommandResultRequest,
     CommandResultResponse,
     CommandSummaryResponse,
@@ -65,11 +68,27 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-def apartment_to_summary(apartment: Apartment) -> AdminApartmentTimezoneSummaryResponse:
+def apartment_to_summary(
+    apartment: Apartment,
+    *,
+    gallery_count: int = 0,
+) -> AdminApartmentTimezoneSummaryResponse:
     return AdminApartmentTimezoneSummaryResponse(
         apartment_id=apartment.apartment_id,
         timezone=apartment.timezone,
-        has_guest_background=apartment.guest_background_filename is not None,
+        address_line1=apartment.address_line1,
+        address_line2=apartment.address_line2,
+        postal_code=apartment.postal_code,
+        city=apartment.city,
+        country_code=apartment.country_code,
+        latitude=apartment.latitude,
+        longitude=apartment.longitude,
+        has_guest_background=(
+            apartment.guest_background_image_id is not None
+            or apartment.guest_background_filename is not None
+        ),
+        guest_background_image_id=apartment.guest_background_image_id,
+        gallery_count=gallery_count,
     )
 
 
@@ -262,6 +281,91 @@ def guest_background_directory() -> Path:
         raise
 
 
+def apartment_gallery_directory() -> Path:
+    configured = Path(settings.apartment_gallery_dir)
+    directory = configured if configured.is_absolute() else (Path.cwd() / configured)
+
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory.resolve()
+    except PermissionError:
+        if settings.database_url.startswith("sqlite:///"):
+            db_file = settings.database_url.replace("sqlite:///", "", 1)
+            db_path = Path(db_file)
+            if not db_path.is_absolute():
+                db_path = (Path.cwd() / db_path).resolve()
+
+            fallback = db_path.parent / "apartment-gallery"
+            fallback.mkdir(parents=True, exist_ok=True)
+            return fallback
+
+        raise
+
+
+def normalized_apartment_key(apartment_id: str) -> str:
+    return "".join(ch if ch.isalnum() or ch in ("-", "_") else "-" for ch in apartment_id)
+
+
+def apartment_gallery_apartment_directory(apartment_id: str) -> Path:
+    apartment_dir = apartment_gallery_directory() / normalized_apartment_key(apartment_id)
+    apartment_dir.mkdir(parents=True, exist_ok=True)
+    return apartment_dir
+
+
+def build_apartment_image_filename(apartment_id: str, extension: str) -> str:
+    return f"{normalized_apartment_key(apartment_id)}-{token_urlsafe(18)}{extension}"
+
+
+def apartment_image_path(apartment_image: ApartmentImage) -> Path | None:
+    filename = Path(apartment_image.storage_filename).name
+    candidate = (
+        apartment_gallery_apartment_directory(apartment_image.apartment_id) / filename
+    ).resolve()
+    base = apartment_gallery_directory().resolve()
+    if base not in candidate.parents and candidate != base:
+        return None
+    return candidate
+
+
+def count_gallery_images(session: Session, apartment_ids: set[str]) -> dict[str, int]:
+    if not apartment_ids:
+        return {}
+
+    rows = session.exec(
+        select(ApartmentImage.apartment_id, func.count(ApartmentImage.id))
+        .where(ApartmentImage.apartment_id.in_(list(apartment_ids)))
+        .group_by(ApartmentImage.apartment_id)
+    ).all()
+    return {apartment_id: int(count) for apartment_id, count in rows}
+
+
+def apartment_image_to_summary(
+    apartment_image: ApartmentImage,
+    *,
+    request: Request,
+    is_guest_background: bool,
+) -> ApartmentImageSummaryResponse:
+    url = str(
+        request.url_for(
+            "admin_get_apartment_image_file",
+            apartment_id=apartment_image.apartment_id,
+            image_id=apartment_image.id,
+        )
+    )
+    return ApartmentImageSummaryResponse(
+        id=apartment_image.id,
+        apartment_id=apartment_image.apartment_id,
+        original_filename=apartment_image.original_filename,
+        content_type=apartment_image.content_type,
+        byte_size=apartment_image.byte_size,
+        sort_order=apartment_image.sort_order,
+        image_url=url,
+        is_guest_background=is_guest_background,
+        created_at=apartment_image.created_at,
+        updated_at=apartment_image.updated_at,
+    )
+
+
 def normalize_background_extension(file: UploadFile) -> str | None:
     filename = (file.filename or "").lower()
     if "." in filename:
@@ -312,6 +416,83 @@ def build_guest_background_url(request: Request, apartment_id: str) -> str:
     return f"{base_url}?exp={exp}&sig={sig}"
 
 
+async def store_apartment_gallery_image(
+    session: Session,
+    *,
+    apartment: Apartment,
+    file: UploadFile,
+    set_as_guest_background: bool,
+) -> ApartmentImage:
+    extension = normalize_background_extension(file)
+    if extension is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported image format. Use JPG, PNG, or WEBP.",
+        )
+
+    image_count = int(
+        session.exec(
+            select(func.count(ApartmentImage.id)).where(
+                ApartmentImage.apartment_id == apartment.apartment_id
+            )
+        ).one()
+    )
+    if image_count >= settings.apartment_gallery_max_images:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Apartment gallery limit reached. Maximum is "
+                f"{settings.apartment_gallery_max_images} images."
+            ),
+        )
+
+    payload = await file.read()
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty image file.")
+    if len(payload) > settings.guest_background_max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Image too large.",
+        )
+
+    filename = build_apartment_image_filename(apartment.apartment_id, extension)
+    target_path = apartment_gallery_apartment_directory(apartment.apartment_id) / filename
+    target_path.write_bytes(payload)
+
+    max_sort_order = session.exec(
+        select(func.max(ApartmentImage.sort_order)).where(
+            ApartmentImage.apartment_id == apartment.apartment_id
+        )
+    ).one()
+    next_sort_order = int(max_sort_order or 0) + 1
+    now = utc_now()
+
+    apartment_image = ApartmentImage(
+        apartment_id=apartment.apartment_id,
+        storage_filename=filename,
+        original_filename=(file.filename or "image").strip() or "image",
+        content_type=(file.content_type or "application/octet-stream").lower(),
+        byte_size=len(payload),
+        sha256=hashlib.sha256(payload).hexdigest(),
+        sort_order=next_sort_order,
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(apartment_image)
+    session.flush()
+
+    if set_as_guest_background:
+        apartment.guest_background_image_id = apartment_image.id
+        apartment.guest_background_filename = None
+        apartment.guest_background_updated_at = now
+
+    apartment.updated_at = now
+    session.add(apartment)
+    session.commit()
+    session.refresh(apartment_image)
+    return apartment_image
+
+
 @router.get(
     "/admin/apartments",
     response_model=list[AdminApartmentTimezoneSummaryResponse],
@@ -331,7 +512,15 @@ def admin_list_apartments(
     if apartment_id:
         query = query.where(Apartment.apartment_id == apartment_id)
 
-    return [apartment_to_summary(apartment) for apartment in session.exec(query).all()]
+    apartments = session.exec(query).all()
+    gallery_counts = count_gallery_images(session, {row.apartment_id for row in apartments})
+    return [
+        apartment_to_summary(
+            apartment,
+            gallery_count=gallery_counts.get(apartment.apartment_id, 0),
+        )
+        for apartment in apartments
+    ]
 
 
 @router.get(
@@ -350,7 +539,10 @@ def admin_get_apartment(
     session: Annotated[Session, Depends(get_session)],
 ) -> AdminApartmentTimezoneSummaryResponse:
     apartment = get_apartment_or_404(session, apartment_id)
-    return apartment_to_summary(apartment)
+    gallery_count = count_gallery_images(session, {apartment.apartment_id}).get(
+        apartment.apartment_id, 0
+    )
+    return apartment_to_summary(apartment, gallery_count=gallery_count)
 
 
 @router.post(
@@ -380,6 +572,13 @@ def admin_create_apartment(
     apartment = Apartment(
         apartment_id=payload.apartment_id,
         timezone=timezone_name,
+        address_line1=payload.address_line1,
+        address_line2=payload.address_line2,
+        postal_code=payload.postal_code,
+        city=payload.city,
+        country_code=payload.country_code.upper() if payload.country_code else None,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
         created_at=now,
         updated_at=now,
     )
@@ -387,7 +586,7 @@ def admin_create_apartment(
     session.commit()
     session.refresh(apartment)
 
-    return apartment_to_summary(apartment)
+    return apartment_to_summary(apartment, gallery_count=0)
 
 
 @router.put(
@@ -412,7 +611,44 @@ def admin_update_apartment_timezone(
     session.add(apartment)
     session.commit()
 
-    return apartment_to_summary(apartment)
+    gallery_count = count_gallery_images(session, {apartment.apartment_id}).get(
+        apartment.apartment_id, 0
+    )
+    return apartment_to_summary(apartment, gallery_count=gallery_count)
+
+
+@router.patch(
+    "/admin/apartments/{apartment_id}",
+    response_model=AdminApartmentTimezoneSummaryResponse,
+    tags=["apartments"],
+    summary="Update apartment metadata",
+    description="Updates apartment timezone, address fields, and geo-location metadata.",
+    dependencies=[Depends(require_admin_token)],
+)
+def admin_update_apartment(
+    apartment_id: str,
+    payload: AdminApartmentUpdateRequest,
+    session: Annotated[Session, Depends(get_session)],
+) -> AdminApartmentTimezoneSummaryResponse:
+    apartment = get_apartment_or_404(session, apartment_id)
+    update_data = payload.model_dump(exclude_unset=True)
+
+    if "timezone" in update_data and update_data["timezone"] is not None:
+        update_data["timezone"] = validate_timezone_name(update_data["timezone"])
+
+    if "country_code" in update_data and update_data["country_code"] is not None:
+        update_data["country_code"] = update_data["country_code"].upper()
+
+    for field, value in update_data.items():
+        setattr(apartment, field, value)
+
+    apartment.updated_at = utc_now()
+    session.add(apartment)
+    session.commit()
+    gallery_count = count_gallery_images(session, {apartment.apartment_id}).get(
+        apartment.apartment_id, 0
+    )
+    return apartment_to_summary(apartment, gallery_count=gallery_count)
 
 
 @router.post(
@@ -431,37 +667,15 @@ async def admin_upload_apartment_guest_background(
     file: Annotated[UploadFile, File(...)],
 ) -> AdminApartmentTimezoneSummaryResponse:
     apartment = get_apartment_or_404(session, apartment_id)
-    extension = normalize_background_extension(file)
-    if extension is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unsupported image format. Use JPG, PNG, or WEBP.",
-        )
-
-    payload = await file.read()
-    if not payload:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty image file.")
-    if len(payload) > settings.guest_background_max_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="Image too large.",
-        )
-
-    filename = build_guest_background_filename(apartment_id, extension)
-    target_path = guest_background_directory() / filename
-    target_path.write_bytes(payload)
-
-    previous_path = apartment_background_path(apartment)
-    apartment.guest_background_filename = filename
-    apartment.guest_background_updated_at = utc_now()
-    apartment.updated_at = utc_now()
-    session.add(apartment)
-    session.commit()
-
-    if previous_path and previous_path.exists() and previous_path.name != filename:
-        previous_path.unlink(missing_ok=True)
-
-    return apartment_to_summary(apartment)
+    await store_apartment_gallery_image(
+        session,
+        apartment=apartment,
+        file=file,
+        set_as_guest_background=True,
+    )
+    refreshed = get_apartment_or_404(session, apartment_id)
+    gallery_count = count_gallery_images(session, {apartment_id}).get(apartment_id, 0)
+    return apartment_to_summary(refreshed, gallery_count=gallery_count)
 
 
 @router.delete(
@@ -479,6 +693,7 @@ def admin_delete_apartment_guest_background(
     apartment = get_apartment_or_404(session, apartment_id)
     existing_path = apartment_background_path(apartment)
 
+    apartment.guest_background_image_id = None
     apartment.guest_background_filename = None
     apartment.guest_background_updated_at = utc_now()
     apartment.updated_at = utc_now()
@@ -488,7 +703,209 @@ def admin_delete_apartment_guest_background(
     if existing_path and existing_path.exists():
         existing_path.unlink(missing_ok=True)
 
-    return apartment_to_summary(apartment)
+    gallery_count = count_gallery_images(session, {apartment_id}).get(apartment_id, 0)
+    return apartment_to_summary(apartment, gallery_count=gallery_count)
+
+
+@router.get(
+    "/admin/apartments/{apartment_id}/images",
+    response_model=list[ApartmentImageSummaryResponse],
+    tags=["apartments"],
+    summary="List apartment images",
+    description="Returns the apartment image gallery in display order.",
+    dependencies=[Depends(require_admin_token)],
+)
+def admin_list_apartment_images(
+    apartment_id: str,
+    request: Request,
+    session: Annotated[Session, Depends(get_session)],
+) -> list[ApartmentImageSummaryResponse]:
+    apartment = get_apartment_or_404(session, apartment_id)
+    images = session.exec(
+        select(ApartmentImage)
+        .where(ApartmentImage.apartment_id == apartment_id)
+        .order_by(ApartmentImage.sort_order.asc(), ApartmentImage.id.asc())
+    ).all()
+    return [
+        apartment_image_to_summary(
+            image,
+            request=request,
+            is_guest_background=(apartment.guest_background_image_id == image.id),
+        )
+        for image in images
+    ]
+
+
+@router.post(
+    "/admin/apartments/{apartment_id}/images",
+    response_model=ApartmentImageSummaryResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["apartments"],
+    summary="Upload apartment image",
+    description="Uploads an image into the apartment gallery.",
+    dependencies=[Depends(require_admin_token)],
+)
+async def admin_upload_apartment_image(
+    apartment_id: str,
+    request: Request,
+    session: Annotated[Session, Depends(get_session)],
+    file: Annotated[UploadFile, File(...)],
+) -> ApartmentImageSummaryResponse:
+    apartment = get_apartment_or_404(session, apartment_id)
+    image = await store_apartment_gallery_image(
+        session,
+        apartment=apartment,
+        file=file,
+        set_as_guest_background=False,
+    )
+    refreshed = get_apartment_or_404(session, apartment_id)
+    return apartment_image_to_summary(
+        image,
+        request=request,
+        is_guest_background=(refreshed.guest_background_image_id == image.id),
+    )
+
+
+@router.get(
+    "/admin/apartments/{apartment_id}/images/{image_id}/file",
+    name="admin_get_apartment_image_file",
+    tags=["apartments"],
+    summary="Get apartment image file",
+    description="Returns the binary file for an apartment gallery image.",
+    dependencies=[Depends(require_admin_token)],
+)
+def admin_get_apartment_image_file(
+    apartment_id: str,
+    image_id: int,
+    session: Annotated[Session, Depends(get_session)],
+) -> FileResponse:
+    image = session.get(ApartmentImage, image_id)
+    if image is None or image.apartment_id != apartment_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    image_path = apartment_image_path(image)
+    if image_path is None or not image_path.exists() or not image_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    media_type = (
+        image.content_type
+        or mimetypes.guess_type(image_path.name)[0]
+        or "application/octet-stream"
+    )
+    return FileResponse(image_path, media_type=media_type)
+
+
+@router.patch(
+    "/admin/apartments/{apartment_id}/images/reorder",
+    response_model=list[ApartmentImageSummaryResponse],
+    tags=["apartments"],
+    summary="Reorder apartment images",
+    description="Updates sort_order for apartment gallery images.",
+    dependencies=[Depends(require_admin_token)],
+)
+def admin_reorder_apartment_images(
+    apartment_id: str,
+    payload: ApartmentImageReorderRequest,
+    request: Request,
+    session: Annotated[Session, Depends(get_session)],
+) -> list[ApartmentImageSummaryResponse]:
+    apartment = get_apartment_or_404(session, apartment_id)
+    existing = session.exec(
+        select(ApartmentImage)
+        .where(ApartmentImage.apartment_id == apartment_id)
+        .order_by(ApartmentImage.id.asc())
+    ).all()
+    existing_ids = {row.id for row in existing}
+    payload_ids = {entry.image_id for entry in payload.items}
+    if payload_ids != existing_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reorder payload must include all gallery image IDs exactly once.",
+        )
+
+    by_id = {row.id: row for row in existing}
+    now = utc_now()
+    for entry in payload.items:
+        image = by_id[entry.image_id]
+        image.sort_order = entry.sort_order
+        image.updated_at = now
+        session.add(image)
+
+    session.commit()
+
+    ordered = session.exec(
+        select(ApartmentImage)
+        .where(ApartmentImage.apartment_id == apartment_id)
+        .order_by(ApartmentImage.sort_order.asc(), ApartmentImage.id.asc())
+    ).all()
+    return [
+        apartment_image_to_summary(
+            image,
+            request=request,
+            is_guest_background=(apartment.guest_background_image_id == image.id),
+        )
+        for image in ordered
+    ]
+
+
+@router.post(
+    "/admin/apartments/{apartment_id}/images/{image_id}/set-guest-background",
+    response_model=AdminApartmentTimezoneSummaryResponse,
+    tags=["apartments"],
+    summary="Set image as guest background",
+    description="Marks a gallery image as the active guest background for the apartment.",
+    dependencies=[Depends(require_admin_token)],
+)
+def admin_set_guest_background_image(
+    apartment_id: str,
+    image_id: int,
+    session: Annotated[Session, Depends(get_session)],
+) -> AdminApartmentTimezoneSummaryResponse:
+    apartment = get_apartment_or_404(session, apartment_id)
+    image = session.get(ApartmentImage, image_id)
+    if image is None or image.apartment_id != apartment_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    apartment.guest_background_image_id = image.id
+    apartment.guest_background_filename = None
+    apartment.guest_background_updated_at = utc_now()
+    apartment.updated_at = utc_now()
+    session.add(apartment)
+    session.commit()
+    gallery_count = count_gallery_images(session, {apartment_id}).get(apartment_id, 0)
+    return apartment_to_summary(apartment, gallery_count=gallery_count)
+
+
+@router.delete(
+    "/admin/apartments/{apartment_id}/images/{image_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["apartments"],
+    summary="Delete apartment image",
+    description="Deletes one gallery image and clears guest background mapping when applicable.",
+    dependencies=[Depends(require_admin_token)],
+)
+def admin_delete_apartment_image(
+    apartment_id: str,
+    image_id: int,
+    session: Annotated[Session, Depends(get_session)],
+) -> None:
+    apartment = get_apartment_or_404(session, apartment_id)
+    image = session.get(ApartmentImage, image_id)
+    if image is None or image.apartment_id != apartment_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+
+    if apartment.guest_background_image_id == image.id:
+        apartment.guest_background_image_id = None
+        apartment.guest_background_updated_at = utc_now()
+        apartment.updated_at = utc_now()
+        session.add(apartment)
+
+    image_path = apartment_image_path(image)
+    session.delete(image)
+    session.commit()
+
+    if image_path and image_path.exists():
+        image_path.unlink(missing_ok=True)
 
 
 @router.delete(
@@ -521,6 +938,15 @@ def admin_delete_apartment(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Cannot delete apartment with existing access codes.",
+        )
+
+    has_images = session.exec(
+        select(ApartmentImage.id).where(ApartmentImage.apartment_id == apartment_id).limit(1)
+    ).first()
+    if has_images is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot delete apartment with existing gallery images.",
         )
 
     session.delete(apartment)
@@ -1083,7 +1509,11 @@ def guest_background_url(
     apartment = session.exec(
         select(Apartment).where(Apartment.apartment_id == apartment_id)
     ).first()
-    if apartment is None or apartment.guest_background_filename is None:
+    if apartment is None:
+        return GuestBackgroundUrlResponse(image_url=None)
+
+    has_background = apartment.guest_background_image_id is not None
+    if not has_background and apartment.guest_background_filename is None:
         return GuestBackgroundUrlResponse(image_url=None)
 
     return GuestBackgroundUrlResponse(image_url=build_guest_background_url(request, apartment_id))
@@ -1115,6 +1545,22 @@ def guest_get_background(
     ).first()
     if apartment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+    if apartment.guest_background_image_id is not None:
+        apartment_image = session.get(ApartmentImage, apartment.guest_background_image_id)
+        if apartment_image is None or apartment_image.apartment_id != apartment_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+        image_path = apartment_image_path(apartment_image)
+        if image_path is None or not image_path.exists() or not image_path.is_file():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+        media_type = apartment_image.content_type or mimetypes.guess_type(image_path.name)[0]
+        return FileResponse(
+            image_path,
+            media_type=media_type or "application/octet-stream",
+            headers={"Cache-Control": "private, max-age=60"},
+        )
 
     background_path = apartment_background_path(apartment)
     if background_path is None or not background_path.exists() or not background_path.is_file():

@@ -633,9 +633,93 @@ def test_admin_can_manage_apartment_timezone(tmp_path: Path) -> None:
         {
             "apartment_id": "apartment-05",
             "timezone": "Europe/Berlin",
+            "address_line1": None,
+            "address_line2": None,
+            "postal_code": None,
+            "city": None,
+            "country_code": None,
+            "latitude": None,
+            "longitude": None,
             "has_guest_background": False,
+            "guest_background_image_id": None,
+            "gallery_count": 0,
         }
     ]
+
+
+def test_admin_can_update_apartment_metadata(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+    client = TestClient(app)
+
+    create_response = client.post(
+        "/api/admin/apartments",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"apartment_id": "apartment-meta", "timezone": "UTC"},
+    )
+    assert create_response.status_code == 201
+
+    update_response = client.patch(
+        "/api/admin/apartments/apartment-meta",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={
+            "address_line1": "Main Street 1",
+            "postal_code": "10115",
+            "city": "Berlin",
+            "country_code": "de",
+            "latitude": 52.53,
+            "longitude": 13.38,
+        },
+    )
+
+    assert update_response.status_code == 200
+    payload = update_response.json()
+    assert payload["address_line1"] == "Main Street 1"
+    assert payload["postal_code"] == "10115"
+    assert payload["city"] == "Berlin"
+    assert payload["country_code"] == "DE"
+    assert payload["latitude"] == 52.53
+    assert payload["longitude"] == 13.38
+
+
+def test_admin_can_manage_apartment_gallery_images(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+    client = TestClient(app)
+
+    create_response = client.post(
+        "/api/admin/apartments",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"apartment_id": "apartment-gallery", "timezone": "UTC"},
+    )
+    assert create_response.status_code == 201
+
+    upload_response = client.post(
+        "/api/admin/apartments/apartment-gallery/images",
+        headers={"X-Admin-Token": settings.admin_token},
+        files={"file": ("one.png", b"png-bytes", "image/png")},
+    )
+    assert upload_response.status_code == 201
+    image_id = upload_response.json()["id"]
+
+    list_response = client.get(
+        "/api/admin/apartments/apartment-gallery/images",
+        headers={"X-Admin-Token": settings.admin_token},
+    )
+    assert list_response.status_code == 200
+    assert len(list_response.json()) == 1
+
+    set_bg_response = client.post(
+        f"/api/admin/apartments/apartment-gallery/images/{image_id}/set-guest-background",
+        headers={"X-Admin-Token": settings.admin_token},
+    )
+    assert set_bg_response.status_code == 200
+    assert set_bg_response.json()["guest_background_image_id"] == image_id
+
+    guest_bg_url_response = client.get(
+        "/api/guest/background-url",
+        params={"apartment_id": "apartment-gallery"},
+    )
+    assert guest_bg_url_response.status_code == 200
+    assert isinstance(guest_bg_url_response.json()["image_url"], str)
 
 
 def test_admin_rejects_invalid_apartment_timezone(tmp_path: Path) -> None:
