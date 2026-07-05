@@ -32,6 +32,8 @@ type ApartmentSummary = {
 };
 
 const MAX_GUEST_BACKGROUND_BYTES = 5 * 1024 * 1024;
+const MAX_UPLOAD_BATCH_FILES = 4;
+const MAX_UPLOAD_BATCH_BYTES = 8 * 1024 * 1024;
 
 function summarizeApartments(
   apartments: ApartmentTimezone[],
@@ -93,6 +95,32 @@ function withAdminToken(url: string, adminToken: string): string {
     const separator = url.includes("?") ? "&" : "?";
     return `${url}${separator}admin_token=${encodeURIComponent(adminToken)}`;
   }
+}
+
+function buildUploadBatches(files: File[]): File[][] {
+  const batches: File[][] = [];
+  let current: File[] = [];
+  let currentBytes = 0;
+
+  for (const file of files) {
+    const wouldExceedCount = current.length >= MAX_UPLOAD_BATCH_FILES;
+    const wouldExceedBytes = currentBytes + file.size > MAX_UPLOAD_BATCH_BYTES;
+
+    if (current.length > 0 && (wouldExceedCount || wouldExceedBytes)) {
+      batches.push(current);
+      current = [];
+      currentBytes = 0;
+    }
+
+    current.push(file);
+    currentBytes += file.size;
+  }
+
+  if (current.length > 0) {
+    batches.push(current);
+  }
+
+  return batches;
 }
 
 export function ApartmentsPage() {
@@ -306,15 +334,22 @@ export function ApartmentsPage() {
     setUploadingBackgroundApartmentId(apartmentId);
     setMessage("");
     try {
-      const result = await api.uploadApartmentImages(getAdminToken(), apartmentId, files);
+      const batches = buildUploadBatches(files);
+      let uploadedCount = 0;
+      let skippedCount = 0;
+
+      for (const batch of batches) {
+        const result = await api.uploadApartmentImages(getAdminToken(), apartmentId, batch);
+        uploadedCount += result.uploaded.length;
+        skippedCount += result.skipped_existing.length;
+      }
+
       await load();
       if (expandedGalleryApartmentId === apartmentId) {
         const rows = await api.listApartmentImages(getAdminToken(), apartmentId);
         setImagesByApartment((prev) => ({ ...prev, [apartmentId]: rows }));
       }
 
-      const uploadedCount = result.uploaded.length;
-      const skippedCount = result.skipped_existing.length;
       if (uploadedCount > 0 && skippedCount > 0) {
         setMessage(
           `${uploadedCount} image(s) uploaded, ${skippedCount} duplicate image(s) ignored for ${apartmentId}.`,
