@@ -47,7 +47,7 @@ class DeviceQueueManager:
         try:
             await asyncio.wait_for(event.wait(), timeout=timeout_seconds)
             return True
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return False
         finally:
             # Reset for next waiter(s)
