@@ -11,12 +11,45 @@ from .settings import settings
 
 configure_logging(settings.logging_timezone)
 
+openapi_tags = [
+    {
+        "name": "apartments",
+        "description": "Apartment configuration, timezone settings, and guest background assets.",
+    },
+    {
+        "name": "devices",
+        "description": "Admin device provisioning, token rotation, updates, and status views.",
+    },
+    {
+        "name": "access_codes",
+        "description": "Admin management of guest access codes and validity windows.",
+    },
+    {
+        "name": "commands",
+        "description": "Door command lifecycle, recent command views, and manual command actions.",
+    },
+    {
+        "name": "access_logs",
+        "description": "Audit log retrieval and maintenance operations for access events.",
+    },
+    {
+        "name": "guest",
+        "description": "Guest-facing endpoints for opening doors and polling command status.",
+    },
+    {
+        "name": "device_agent",
+        "description": "Device-authenticated long-poll and command result reporting endpoints.",
+    },
+    {"name": "system", "description": "Service health and system endpoints."},
+]
+
 app = FastAPI(
     title=settings.app_name,
     debug=settings.app_debug,
     docs_url=settings.docs_url,
     redoc_url=settings.redoc_url,
     openapi_url=settings.openapi_url,
+    openapi_tags=openapi_tags,
 )
 
 app.add_middleware(

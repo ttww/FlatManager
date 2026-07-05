@@ -315,6 +315,7 @@ def build_guest_background_url(request: Request, apartment_id: str) -> str:
 @router.get(
     "/admin/apartments",
     response_model=list[AdminApartmentTimezoneSummaryResponse],
+    tags=["apartments"],
     summary="List apartments",
     description=(
         "Returns all configured apartments and their timezone metadata. "
@@ -336,6 +337,7 @@ def admin_list_apartments(
 @router.get(
     "/admin/apartments/{apartment_id}",
     response_model=AdminApartmentTimezoneSummaryResponse,
+    tags=["apartments"],
     summary="Get apartment",
     description=(
         "Returns one apartment by apartment_id, including timezone and "
@@ -355,6 +357,7 @@ def admin_get_apartment(
     "/admin/apartments",
     response_model=AdminApartmentTimezoneSummaryResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=["apartments"],
     summary="Create apartment",
     description=(
         "Creates a new apartment configuration with an IANA timezone used "
@@ -390,6 +393,7 @@ def admin_create_apartment(
 @router.put(
     "/admin/apartments/{apartment_id}/timezone",
     response_model=AdminApartmentTimezoneSummaryResponse,
+    tags=["apartments"],
     summary="Update apartment timezone",
     description=(
         "Updates the timezone of an existing apartment. Timezone must be a valid IANA name."
@@ -414,6 +418,7 @@ def admin_update_apartment_timezone(
 @router.post(
     "/admin/apartments/{apartment_id}/guest-background",
     response_model=AdminApartmentTimezoneSummaryResponse,
+    tags=["apartments"],
     summary="Upload guest background",
     description=(
         "Uploads or replaces the guest page background image for an apartment (JPG, PNG, WEBP)."
@@ -462,6 +467,7 @@ async def admin_upload_apartment_guest_background(
 @router.delete(
     "/admin/apartments/{apartment_id}/guest-background",
     response_model=AdminApartmentTimezoneSummaryResponse,
+    tags=["apartments"],
     summary="Delete guest background",
     description="Removes the apartment-specific guest background image and clears its metadata.",
     dependencies=[Depends(require_admin_token)],
@@ -488,6 +494,7 @@ def admin_delete_apartment_guest_background(
 @router.delete(
     "/admin/apartments/{apartment_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    tags=["apartments"],
     summary="Delete apartment",
     description="Deletes an apartment when it has no dependent devices or access codes.",
     dependencies=[Depends(require_admin_token)],
@@ -553,6 +560,7 @@ def get_current_device(
 @router.post(
     "/admin/devices",
     response_model=AdminDeviceCreateResponse,
+    tags=["devices"],
     summary="Create device",
     description=(
         "Registers a new hardware device for an apartment and returns its initial bearer token."
@@ -591,6 +599,7 @@ def admin_create_device(
 @router.get(
     "/admin/devices",
     response_model=list[AdminDeviceSummaryResponse],
+    tags=["devices"],
     summary="List devices",
     description=(
         "Returns registered devices with apartment, status, and last-seen "
@@ -621,6 +630,7 @@ def admin_list_devices(
 @router.post(
     "/admin/devices/{device_id}/rotate-token",
     response_model=AdminRotateTokenResponse,
+    tags=["devices"],
     summary="Rotate device token",
     description=(
         "Invalidates the current device bearer token and issues a new one for the given device."
@@ -649,6 +659,7 @@ def admin_rotate_device_token(
 @router.patch(
     "/admin/devices/{device_id}",
     response_model=AdminDeviceSummaryResponse,
+    tags=["devices"],
     summary="Update device",
     description="Updates mutable device fields such as apartment assignment or device name.",
     dependencies=[Depends(require_admin_token)],
@@ -682,6 +693,7 @@ def admin_update_device(
 @router.delete(
     "/admin/devices/{device_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    tags=["devices"],
     summary="Delete device",
     description="Deletes a registered device and removes it from future command delivery.",
     dependencies=[Depends(require_admin_token)],
@@ -909,6 +921,7 @@ def try_claim_command(session: Session, *, command_id: int, device_id: int) -> D
 @router.post(
     "/guest/open",
     response_model=GuestOpenResponse,
+    tags=["guest"],
     summary="Request guest door open",
     description=(
         "Validates apartment and access code constraints, logs the attempt, "
@@ -1055,6 +1068,7 @@ def guest_open(
 @router.get(
     "/guest/background-url",
     response_model=GuestBackgroundUrlResponse,
+    tags=["guest"],
     summary="Get signed guest background URL",
     description=(
         "Returns a short-lived signed URL for the apartment guest background "
@@ -1078,6 +1092,7 @@ def guest_background_url(
 @router.get(
     "/guest/background/{apartment_id}",
     name="guest_get_background",
+    tags=["guest"],
     summary="Download guest background",
     description=(
         "Serves the guest background image for an apartment when signature and "
@@ -1116,6 +1131,7 @@ def guest_get_background(
 @router.get(
     "/guest/command-status/{command_id}",
     response_model=GuestCommandStatusResponse,
+    tags=["guest"],
     summary="Get guest command status",
     description="Returns the current status of a guest-issued door command for the same apartment.",
 )
@@ -1141,6 +1157,7 @@ def guest_command_status(
 @router.get(
     "/device/wait-command",
     response_model=WaitCommandResponse,
+    tags=["device_agent"],
     summary="Device long-poll for command",
     description=(
         "Authenticated device endpoint that waits for pending commands and "
@@ -1229,6 +1246,7 @@ async def wait_command(
 @router.post(
     "/device/command-result",
     response_model=CommandResultResponse,
+    tags=["device_agent"],
     summary="Submit command execution result",
     description=(
         "Authenticated device endpoint to acknowledge a command and report execution outcome."
@@ -1291,6 +1309,7 @@ def command_result(
 @router.get(
     "/admin/devices/status",
     response_model=list[DeviceStatusResponse],
+    tags=["devices"],
     summary="List device status",
     description="Returns online/offline status and heartbeat details for registered devices.",
     dependencies=[Depends(require_admin_token)],
@@ -1335,6 +1354,7 @@ def admin_devices_status(
 @router.get(
     "/admin/commands/recent",
     response_model=list[CommandSummaryResponse],
+    tags=["commands"],
     summary="List recent commands",
     description=(
         "Returns recently created door commands with optional apartment filter "
@@ -1367,6 +1387,7 @@ def admin_recent_commands(
 @router.get(
     "/admin/access-logs/recent",
     response_model=list[AccessLogSummaryResponse],
+    tags=["access_logs"],
     summary="List recent access logs",
     description=(
         "Returns recent access events for auditing, with optional apartment "
@@ -1399,6 +1420,7 @@ def admin_recent_access_logs(
 @router.delete(
     "/admin/commands",
     status_code=status.HTTP_204_NO_CONTENT,
+    tags=["commands"],
     summary="Delete all commands",
     description=(
         "Deletes all stored door commands. Intended for maintenance and test reset workflows."
@@ -1416,6 +1438,7 @@ def admin_delete_all_commands(
 @router.delete(
     "/admin/access-logs",
     status_code=status.HTTP_204_NO_CONTENT,
+    tags=["access_logs"],
     summary="Delete all access logs",
     description=(
         "Deletes all access log entries. Intended for maintenance and test reset workflows."
@@ -1433,6 +1456,7 @@ def admin_delete_all_access_logs(
 @router.post(
     "/admin/commands/manual-open",
     response_model=AdminManualOpenResponse,
+    tags=["commands"],
     summary="Request manual open",
     description=(
         "Creates an admin-triggered open command for an apartment and notifies "
@@ -1494,6 +1518,7 @@ def admin_manual_open(
 @router.get(
     "/admin/access-codes",
     response_model=list[AdminAccessCodeSummaryResponse],
+    tags=["access_codes"],
     summary="List access codes",
     description=(
         "Returns configured access codes with validity windows, use counters, and active status."
@@ -1523,6 +1548,7 @@ def admin_list_access_codes(
     "/admin/access-codes",
     response_model=AdminAccessCodeSummaryResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=["access_codes"],
     summary="Create access code",
     description=(
         "Creates an apartment access code with validity window and usage "
@@ -1578,6 +1604,7 @@ def admin_create_access_code(
 @router.patch(
     "/admin/access-codes/{code_id}",
     response_model=AdminAccessCodeSummaryResponse,
+    tags=["access_codes"],
     summary="Update access code",
     description=(
         "Updates mutable access code fields such as validity window, max uses, "
@@ -1624,6 +1651,7 @@ def admin_update_access_code(
 @router.post(
     "/admin/access-codes/{code_id}/deactivate",
     response_model=AdminAccessCodeSummaryResponse,
+    tags=["access_codes"],
     summary="Deactivate access code",
     description="Marks an access code as inactive so it can no longer be used by guests.",
     dependencies=[Depends(require_admin_token)],
@@ -1651,6 +1679,7 @@ def admin_deactivate_access_code(
 @router.delete(
     "/admin/access-codes/{code_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    tags=["access_codes"],
     summary="Delete access code",
     description="Permanently deletes an access code record.",
     dependencies=[Depends(require_admin_token)],
