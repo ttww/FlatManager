@@ -161,6 +161,13 @@ For detailed setup, configuration, troubleshooting, deployment guides, and hardw
 - ✅ Short-lived commands (10 seconds default)
 - ✅ Bounded relay pulse (server-side + device-side limits)
 
+## Database Choice
+
+FlatManager intentionally uses SQLite for this deployment profile.
+
+- Expected request volume is low to moderate and does not justify PostgreSQL operational overhead.
+- PostgreSQL is considered overkill for this application unless usage patterns change significantly.
+
 ---
 
 ## Deployment

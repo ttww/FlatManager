@@ -40,6 +40,14 @@ LOGGING_TIMEZONE=Europe/Berlin uv run flatmanager-api
 - Run tests:
   uv run pytest
 
+## Database rationale
+
+The API intentionally uses SQLite for the current FlatManager workload.
+
+- The expected number of requests does not require PostgreSQL.
+- PostgreSQL would add avoidable operational complexity for this deployment size.
+- Revisit this decision only if sustained traffic or scaling requirements increase.
+
 ## Implemented endpoints
 
 - GET /health
