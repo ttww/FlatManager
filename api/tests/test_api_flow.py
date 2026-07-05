@@ -796,6 +796,33 @@ def test_admin_create_access_code_requires_existing_apartment(tmp_path: Path) ->
     assert response.status_code == 404
 
 
+def test_admin_create_access_code_rejects_non_numeric_code(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+    client = TestClient(app)
+
+    apartment_response = client.post(
+        "/api/admin/apartments",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"apartment_id": "apartment-11", "timezone": "UTC"},
+    )
+    assert apartment_response.status_code == 201
+
+    response = client.post(
+        "/api/admin/access-codes",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={
+            "apartment_id": "apartment-11",
+            "code": "12AB34",
+            "valid_from": "2026-01-15T10:00:00",
+            "valid_until": "2026-01-15T12:00:00",
+            "input_timezone": "UTC",
+            "max_uses": 20,
+        },
+    )
+
+    assert response.status_code == 422
+
+
 def test_admin_get_missing_apartment_returns_not_found(tmp_path: Path) -> None:
     _prepare_test_db(tmp_path)
     client = TestClient(app)

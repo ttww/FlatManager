@@ -115,7 +115,13 @@ class AccessLogSummaryResponse(BaseModel):
 
 class AdminAccessCodeCreateRequest(BaseModel):
     apartment_id: str = Field(min_length=1, max_length=100)
-    code: str = Field(min_length=4, max_length=12)
+    code: str = Field(
+        min_length=4,
+        max_length=12,
+        pattern=r"^\d+$",
+        description="Numeric access code (digits only).",
+        examples=["123456"],
+    )
     valid_from: datetime
     valid_until: datetime
     input_timezone: str | None = Field(default=None, max_length=100)

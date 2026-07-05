@@ -161,8 +161,15 @@ export function CodesPage({ timezoneDisplayMode, browserTimezone }: CodesPagePro
           Numeric Code
           <input
             value={form.code}
-            onChange={(event) => setForm((prev) => ({ ...prev, code: event.target.value }))}
+            onChange={(event) =>
+              setForm((prev) => ({
+                ...prev,
+                code: event.target.value.replace(/\D+/g, ""),
+              }))
+            }
             inputMode="numeric"
+            pattern="[0-9]+"
+            title="Only digits are allowed"
             required
           />
         </label>
