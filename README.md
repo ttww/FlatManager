@@ -2,7 +2,7 @@
 
 **Secure, QR-based guest access for smart doors**
 
-FlatManager is a complete door access solution for short-term guests. Guests scan a QR code, enter a time-limited access code, and instantly open the door via a secure HTTPS connection to an ESP8266 or ESP32 device connected to a relay that triggers the door opener contact.
+FlatManager is a complete door access solution for short-term guests. Guests scan a QR code, enter a time-limited access code, and instantly open the door via a secure HTTPS connection to an ESP32-S2 device connected to a relay that triggers the door opener contact.
 Check the [full documentation](docs/USER_DOCUMENTATION.md).
 
 
@@ -24,12 +24,12 @@ Guest → QR Code → Web Form (HTTPS)
          ├─ Creates command
          └─ Logs access
                  ↓
-         ESP8266 Device (Long Poll)
+         ESP32-S2 Device (Long Poll)
          ├─ Waits for command
          └─ Triggers relay
 ```
 
-The ESP8266 is **never publicly reachable** — it only initiates outbound HTTPS connections to the server.
+The ESP32-S2 is **never publicly reachable** — it only initiates outbound HTTPS connections to the server.
 
 ---
 
@@ -38,7 +38,7 @@ The ESP8266 is **never publicly reachable** — it only initiates outbound HTTPS
 ### Prerequisites
 - Docker & Docker Compose
 - Domain with HTTPS (Let's Encrypt recommended)
-- ESP8266 with WiFi connectivity
+- ESP32-S2 (LOLIN S2 Mini) with WiFi connectivity
 
 ### Build & Run
 
@@ -206,14 +206,14 @@ See `api/.env.example` for all options.
 
 ---
 
-## Device Setup (ESP8266 or ESP32 in esp/)
+## Device Setup (ESP32-S2 in esp/)
+
+Security warning: ESP8266 targets are removed from active setup guidance and should not be used for new deployments due to weaker TLS handling in this project.
 
 Currently configured boards in `esp/platformio.ini`:
 
 | Environment | Board | Upload |
 |---|---|---|
-| `esp01_1m` | ESP8266 ESP-01S | USB/serial |
-| `esp01_1m_ota` | ESP8266 ESP-01S | OTA |
 | `lolin_s2_mini` | ESP32-S2 LOLIN S2 Mini | USB/serial |
 | `lolin_s2_mini_ota` | ESP32-S2 LOLIN S2 Mini | OTA |
 
@@ -233,7 +233,7 @@ Configure your secrets in `esp/include/secrets.h`:
 ```
 
 Board-specific parameters (relay GPIO, active level, LED pin) are set in
-`esp/platformio.ini` under `[relay_esp01]` and `[relay_lolin_s2_mini]`.
+`esp/platformio.ini` under `[relay_lolin_s2_mini]`.
 
 Then build and upload via PlatformIO:
 
