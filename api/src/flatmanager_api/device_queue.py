@@ -6,7 +6,6 @@ without storing command payloads (DB remains source of truth).
 """
 
 import asyncio
-from typing import Dict
 
 
 class DeviceQueueManager:
@@ -20,7 +19,7 @@ class DeviceQueueManager:
     """
 
     def __init__(self) -> None:
-        self._events: Dict[int, asyncio.Event] = {}
+        self._events: dict[int, asyncio.Event] = {}
 
     def notify(self, device_id: int) -> None:
         """Signal all waiters for this device (create Event if needed)."""
@@ -47,7 +46,7 @@ class DeviceQueueManager:
         try:
             await asyncio.wait_for(event.wait(), timeout=timeout_seconds)
             return True
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return False
         finally:
             # Reset for next waiter(s)

@@ -1,98 +1,98 @@
 name: CI
 
 on:
-  push:
-    branches:
-      - "**"
-  pull_request:
-  workflow_dispatch:
+    push:
+        branches:
+            - "**"
+    pull_request:
+    workflow_dispatch:
 
 permissions:
-  contents: read
+    contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    group: ci-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
 
 jobs:
-  api:
-    name: API (lint + tests)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: api
+    api:
+        name: API (lint + tests)
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: api
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+            - name: Setup Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
 
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v6
+            - name: Setup uv
+              uses: astral-sh/setup-uv@v6
 
-      - name: Install dependencies
-        run: uv sync --dev
+            - name: Install dependencies
+              run: uv sync --dev
 
-      - name: Lint (ruff)
-        run: uv run ruff check .
+            - name: Lint (ruff)
+              run: uv run ruff check .
 
-      - name: Run tests
-        run: uv run pytest -q
+            - name: Run tests
+              run: uv run pytest -q
 
-  admin_ui:
-    name: Admin UI (lint + build)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: admin-ui
+    admin_ui:
+        name: Admin UI (lint + build)
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: admin-ui
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: admin-ui/package-lock.json
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+                  cache: npm
+                  cache-dependency-path: admin-ui/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
+            - name: Install dependencies
+              run: npm ci
 
-      - name: Lint
-        run: npm run lint
+            - name: Lint
+              run: npm run lint
 
-      - name: Build
-        run: npm run build
+            - name: Build
+              run: npm run build
 
-  guest_ui:
-    name: Guest UI (lint + build)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: guest-ui
+    guest_ui:
+        name: Guest UI (lint + build)
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: guest-ui
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: guest-ui/package-lock.json
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+                  cache: npm
+                  cache-dependency-path: guest-ui/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
+            - name: Install dependencies
+              run: npm ci
 
-      - name: Lint
-        run: npm run lint
+            - name: Lint
+              run: npm run lint
 
-      - name: Build
-        run: npm run build
+            - name: Build
+              run: npm run build

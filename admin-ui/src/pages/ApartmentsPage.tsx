@@ -95,10 +95,13 @@ export function ApartmentsPage() {
 
   useEffect(() => {
     const cancelled = { value: false };
+    const timerId = window.setTimeout(() => {
+      void load(cancelled);
+    }, 0);
 
-    void load(cancelled);
     return () => {
       cancelled.value = true;
+      window.clearTimeout(timerId);
     };
   }, []);
 

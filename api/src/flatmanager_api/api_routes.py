@@ -316,7 +316,10 @@ def build_guest_background_url(request: Request, apartment_id: str) -> str:
     "/admin/apartments",
     response_model=list[AdminApartmentTimezoneSummaryResponse],
     summary="List apartments",
-    description="Returns all configured apartments and their timezone metadata. Optionally filter by apartment_id.",
+    description=(
+        "Returns all configured apartments and their timezone metadata. "
+        "Optionally filter by apartment_id."
+    ),
     dependencies=[Depends(require_admin_token)],
 )
 def admin_list_apartments(
@@ -334,7 +337,10 @@ def admin_list_apartments(
     "/admin/apartments/{apartment_id}",
     response_model=AdminApartmentTimezoneSummaryResponse,
     summary="Get apartment",
-    description="Returns one apartment by apartment_id, including timezone and guest-background availability.",
+    description=(
+        "Returns one apartment by apartment_id, including timezone and "
+        "guest-background availability."
+    ),
     dependencies=[Depends(require_admin_token)],
 )
 def admin_get_apartment(
@@ -350,7 +356,10 @@ def admin_get_apartment(
     response_model=AdminApartmentTimezoneSummaryResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create apartment",
-    description="Creates a new apartment configuration with an IANA timezone used for schedule and display conversions.",
+    description=(
+        "Creates a new apartment configuration with an IANA timezone used "
+        "for schedule and display conversions."
+    ),
     dependencies=[Depends(require_admin_token)],
 )
 def admin_create_apartment(
@@ -382,7 +391,9 @@ def admin_create_apartment(
     "/admin/apartments/{apartment_id}/timezone",
     response_model=AdminApartmentTimezoneSummaryResponse,
     summary="Update apartment timezone",
-    description="Updates the timezone of an existing apartment. Timezone must be a valid IANA name.",
+    description=(
+        "Updates the timezone of an existing apartment. Timezone must be a valid IANA name."
+    ),
     dependencies=[Depends(require_admin_token)],
 )
 def admin_update_apartment_timezone(
@@ -404,7 +415,9 @@ def admin_update_apartment_timezone(
     "/admin/apartments/{apartment_id}/guest-background",
     response_model=AdminApartmentTimezoneSummaryResponse,
     summary="Upload guest background",
-    description="Uploads or replaces the guest page background image for an apartment (JPG, PNG, WEBP).",
+    description=(
+        "Uploads or replaces the guest page background image for an apartment (JPG, PNG, WEBP)."
+    ),
     dependencies=[Depends(require_admin_token)],
 )
 async def admin_upload_apartment_guest_background(
@@ -541,7 +554,9 @@ def get_current_device(
     "/admin/devices",
     response_model=AdminDeviceCreateResponse,
     summary="Create device",
-    description="Registers a new hardware device for an apartment and returns its initial bearer token.",
+    description=(
+        "Registers a new hardware device for an apartment and returns its initial bearer token."
+    ),
     dependencies=[Depends(require_admin_token)],
 )
 def admin_create_device(
@@ -577,7 +592,10 @@ def admin_create_device(
     "/admin/devices",
     response_model=list[AdminDeviceSummaryResponse],
     summary="List devices",
-    description="Returns registered devices with apartment, status, and last-seen metadata. Optional apartment filter.",
+    description=(
+        "Returns registered devices with apartment, status, and last-seen "
+        "metadata. Optional apartment filter."
+    ),
     dependencies=[Depends(require_admin_token)],
 )
 def admin_list_devices(
@@ -604,7 +622,9 @@ def admin_list_devices(
     "/admin/devices/{device_id}/rotate-token",
     response_model=AdminRotateTokenResponse,
     summary="Rotate device token",
-    description="Invalidates the current device bearer token and issues a new one for the given device.",
+    description=(
+        "Invalidates the current device bearer token and issues a new one for the given device."
+    ),
     dependencies=[Depends(require_admin_token)],
 )
 def admin_rotate_device_token(
@@ -890,7 +910,10 @@ def try_claim_command(session: Session, *, command_id: int, device_id: int) -> D
     "/guest/open",
     response_model=GuestOpenResponse,
     summary="Request guest door open",
-    description="Validates apartment and access code constraints, logs the attempt, and queues an open command if accepted.",
+    description=(
+        "Validates apartment and access code constraints, logs the attempt, "
+        "and queues an open command if accepted."
+    ),
 )
 def guest_open(
     payload: GuestOpenRequest,
@@ -1033,7 +1056,10 @@ def guest_open(
     "/guest/background-url",
     response_model=GuestBackgroundUrlResponse,
     summary="Get signed guest background URL",
-    description="Returns a short-lived signed URL for the apartment guest background image, or null when none exists.",
+    description=(
+        "Returns a short-lived signed URL for the apartment guest background "
+        "image, or null when none exists."
+    ),
 )
 def guest_background_url(
     apartment_id: str,
@@ -1053,7 +1079,10 @@ def guest_background_url(
     "/guest/background/{apartment_id}",
     name="guest_get_background",
     summary="Download guest background",
-    description="Serves the guest background image for an apartment when signature and expiry parameters are valid.",
+    description=(
+        "Serves the guest background image for an apartment when signature and "
+        "expiry parameters are valid."
+    ),
 )
 def guest_get_background(
     apartment_id: str,
@@ -1113,7 +1142,10 @@ def guest_command_status(
     "/device/wait-command",
     response_model=WaitCommandResponse,
     summary="Device long-poll for command",
-    description="Authenticated device endpoint that waits for pending commands and atomically claims one when available.",
+    description=(
+        "Authenticated device endpoint that waits for pending commands and "
+        "atomically claims one when available."
+    ),
 )
 async def wait_command(
     request: Request,
@@ -1198,7 +1230,9 @@ async def wait_command(
     "/device/command-result",
     response_model=CommandResultResponse,
     summary="Submit command execution result",
-    description="Authenticated device endpoint to acknowledge a command and report execution outcome.",
+    description=(
+        "Authenticated device endpoint to acknowledge a command and report execution outcome."
+    ),
 )
 def command_result(
     payload: CommandResultRequest,
@@ -1302,7 +1336,10 @@ def admin_devices_status(
     "/admin/commands/recent",
     response_model=list[CommandSummaryResponse],
     summary="List recent commands",
-    description="Returns recently created door commands with optional apartment filter and bounded result limit.",
+    description=(
+        "Returns recently created door commands with optional apartment filter "
+        "and bounded result limit."
+    ),
     dependencies=[Depends(require_admin_token)],
 )
 def admin_recent_commands(
@@ -1331,7 +1368,10 @@ def admin_recent_commands(
     "/admin/access-logs/recent",
     response_model=list[AccessLogSummaryResponse],
     summary="List recent access logs",
-    description="Returns recent access events for auditing, with optional apartment filter and bounded result limit.",
+    description=(
+        "Returns recent access events for auditing, with optional apartment "
+        "filter and bounded result limit."
+    ),
     dependencies=[Depends(require_admin_token)],
 )
 def admin_recent_access_logs(
@@ -1360,7 +1400,9 @@ def admin_recent_access_logs(
     "/admin/commands",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete all commands",
-    description="Deletes all stored door commands. Intended for maintenance and test reset workflows.",
+    description=(
+        "Deletes all stored door commands. Intended for maintenance and test reset workflows."
+    ),
     dependencies=[Depends(require_admin_token)],
 )
 def admin_delete_all_commands(
@@ -1375,7 +1417,9 @@ def admin_delete_all_commands(
     "/admin/access-logs",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete all access logs",
-    description="Deletes all access log entries. Intended for maintenance and test reset workflows.",
+    description=(
+        "Deletes all access log entries. Intended for maintenance and test reset workflows."
+    ),
     dependencies=[Depends(require_admin_token)],
 )
 def admin_delete_all_access_logs(
@@ -1390,7 +1434,10 @@ def admin_delete_all_access_logs(
     "/admin/commands/manual-open",
     response_model=AdminManualOpenResponse,
     summary="Request manual open",
-    description="Creates an admin-triggered open command for an apartment and notifies the assigned device queue.",
+    description=(
+        "Creates an admin-triggered open command for an apartment and notifies "
+        "the assigned device queue."
+    ),
     dependencies=[Depends(require_admin_token)],
 )
 def admin_manual_open(
@@ -1448,7 +1495,9 @@ def admin_manual_open(
     "/admin/access-codes",
     response_model=list[AdminAccessCodeSummaryResponse],
     summary="List access codes",
-    description="Returns configured access codes with validity windows, use counters, and active status.",
+    description=(
+        "Returns configured access codes with validity windows, use counters, and active status."
+    ),
     dependencies=[Depends(require_admin_token)],
 )
 def admin_list_access_codes(
@@ -1475,7 +1524,10 @@ def admin_list_access_codes(
     response_model=AdminAccessCodeSummaryResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create access code",
-    description="Creates an apartment access code with validity window and usage limits. Code must be numeric (digits only).",
+    description=(
+        "Creates an apartment access code with validity window and usage "
+        "limits. Code must be numeric (digits only)."
+    ),
     dependencies=[Depends(require_admin_token)],
 )
 def admin_create_access_code(
@@ -1527,7 +1579,10 @@ def admin_create_access_code(
     "/admin/access-codes/{code_id}",
     response_model=AdminAccessCodeSummaryResponse,
     summary="Update access code",
-    description="Updates mutable access code fields such as validity window, max uses, metadata, or active flag.",
+    description=(
+        "Updates mutable access code fields such as validity window, max uses, "
+        "metadata, or active flag."
+    ),
     dependencies=[Depends(require_admin_token)],
 )
 def admin_update_access_code(

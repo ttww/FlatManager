@@ -39,7 +39,9 @@ export function CodesPage({ timezoneDisplayMode, browserTimezone }: CodesPagePro
   };
 
   useEffect(() => {
-    void loadCodes();
+    const timerId = window.setTimeout(() => {
+      void loadCodes();
+    }, 0);
     void (async () => {
       try {
         const apartments = await api.listApartmentTimezones(getAdminToken());
@@ -48,6 +50,9 @@ export function CodesPage({ timezoneDisplayMode, browserTimezone }: CodesPagePro
         setApartmentIds([]);
       }
     })();
+    return () => {
+      window.clearTimeout(timerId);
+    };
   }, []);
 
   const loadApartmentTimezone = async (apartmentId: string) => {

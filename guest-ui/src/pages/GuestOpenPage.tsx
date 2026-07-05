@@ -243,21 +243,27 @@ export function GuestOpenPage() {
   useEffect(() => {
     const apartment = apartmentId.trim();
     if (!apartment) {
-      setBackgroundImageUrl(null);
-      return;
+      const timerId = window.setTimeout(() => {
+        setBackgroundImageUrl(null);
+      }, 0);
+      return () => {
+        window.clearTimeout(timerId);
+      };
     }
 
     let cancelled = false;
-    const loadBackground = async () => {
-      const url = await fetchGuestBackgroundUrl(apartment);
-      if (!cancelled) {
-        setBackgroundImageUrl(url);
-      }
-    };
+    const timerId = window.setTimeout(() => {
+      void (async () => {
+        const url = await fetchGuestBackgroundUrl(apartment);
+        if (!cancelled) {
+          setBackgroundImageUrl(url);
+        }
+      })();
+    }, 0);
 
-    void loadBackground();
     return () => {
       cancelled = true;
+      window.clearTimeout(timerId);
     };
   }, [apartmentId]);
 

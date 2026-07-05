@@ -1,23 +1,23 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import {
-  CN,
-  CZ,
-  DE,
-  ES,
-  FR,
-  GB,
-  GR,
-  HU,
-  IL,
-  IN,
-  JP,
-  KR,
-  PL,
-  PT,
-  RU,
-  SA,
-  UA,
+    CN,
+    CZ,
+    DE,
+    ES,
+    FR,
+    GB,
+    GR,
+    HU,
+    IL,
+    IN,
+    JP,
+    KR,
+    PL,
+    PT,
+    RU,
+    SA,
+    UA,
 } from "country-flag-icons/react/3x2";
 
 import type { Locale } from "../i18n/messages";
@@ -102,17 +102,17 @@ function LocaleLabel({ option }: { option: LocaleOption }) {
 export function LanguagePicker({ label, value, options, onChange }: LanguagePickerProps) {
   const listboxId = useId();
   const [isOpen, setIsOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(() => options.findIndex((option) => option.value === value));
+  const selectedIndex = useMemo(
+    () => options.findIndex((option) => option.value === value),
+    [options, value],
+  );
+  const [activeIndex, setActiveIndex] = useState(() => (selectedIndex >= 0 ? selectedIndex : 0));
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const selectedOption = useMemo(
     () => options.find((option) => option.value === value) ?? options[0],
     [options, value],
   );
-
-  useEffect(() => {
-    setActiveIndex(options.findIndex((option) => option.value === value));
-  }, [options, value]);
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
@@ -152,8 +152,7 @@ export function LanguagePicker({ label, value, options, onChange }: LanguagePick
 
   const openMenu = () => {
     setIsOpen(true);
-    const currentIndex = options.findIndex((option) => option.value === value);
-    setActiveIndex(currentIndex >= 0 ? currentIndex : 0);
+    setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
   };
 
   const commitSelection = (nextValue: Locale) => {
