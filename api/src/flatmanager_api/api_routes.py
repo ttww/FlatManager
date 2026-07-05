@@ -45,6 +45,7 @@ from .schemas import (
     AdminManualOpenRequest,
     AdminManualOpenResponse,
     AdminRotateTokenResponse,
+    ApartmentImageBulkUploadResponse,
     ApartmentImageReorderRequest,
     ApartmentImageSummaryResponse,
     CommandResultRequest,
@@ -434,13 +435,39 @@ async def store_apartment_gallery_image(
     apartment: Apartment,
     file: UploadFile,
     set_as_guest_background: bool,
-) -> ApartmentImage:
+) -> tuple[ApartmentImage, bool]:
     extension = normalize_background_extension(file)
     if extension is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Unsupported image format. Use JPG, PNG, or WEBP.",
         )
+
+    payload = await file.read()
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty image file.")
+    if len(payload) > settings.guest_background_max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Image too large.",
+        )
+
+    payload_sha256 = hashlib.sha256(payload).hexdigest()
+    duplicate_image = session.exec(
+        select(ApartmentImage)
+        .where(ApartmentImage.apartment_id == apartment.apartment_id)
+        .where(ApartmentImage.sha256 == payload_sha256)
+    ).first()
+    if duplicate_image is not None:
+        if set_as_guest_background and apartment.guest_background_image_id != duplicate_image.id:
+            now = utc_now()
+            apartment.guest_background_image_id = duplicate_image.id
+            apartment.guest_background_filename = None
+            apartment.guest_background_updated_at = now
+            apartment.updated_at = now
+            session.add(apartment)
+            session.commit()
+        return duplicate_image, False
 
     image_count = int(
         session.exec(
@@ -456,15 +483,6 @@ async def store_apartment_gallery_image(
                 f"Apartment gallery limit reached. Maximum is "
                 f"{settings.apartment_gallery_max_images} images."
             ),
-        )
-
-    payload = await file.read()
-    if not payload:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty image file.")
-    if len(payload) > settings.guest_background_max_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="Image too large.",
         )
 
     filename = build_apartment_image_filename(apartment.apartment_id, extension)
@@ -485,7 +503,7 @@ async def store_apartment_gallery_image(
         original_filename=(file.filename or "image").strip() or "image",
         content_type=(file.content_type or "application/octet-stream").lower(),
         byte_size=len(payload),
-        sha256=hashlib.sha256(payload).hexdigest(),
+        sha256=payload_sha256,
         sort_order=next_sort_order,
         created_at=now,
         updated_at=now,
@@ -502,7 +520,7 @@ async def store_apartment_gallery_image(
     session.add(apartment)
     session.commit()
     session.refresh(apartment_image)
-    return apartment_image
+    return apartment_image, True
 
 
 @router.get(
@@ -764,7 +782,7 @@ async def admin_upload_apartment_image(
     file: Annotated[UploadFile, File(...)],
 ) -> ApartmentImageSummaryResponse:
     apartment = get_apartment_or_404(session, apartment_id)
-    image = await store_apartment_gallery_image(
+    image, _created = await store_apartment_gallery_image(
         session,
         apartment=apartment,
         file=file,
@@ -775,6 +793,64 @@ async def admin_upload_apartment_image(
         image,
         request=request,
         is_guest_background=(refreshed.guest_background_image_id == image.id),
+    )
+
+
+@router.post(
+    "/admin/apartments/{apartment_id}/images/bulk",
+    response_model=ApartmentImageBulkUploadResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["apartments"],
+    summary="Upload multiple apartment images",
+    description=(
+        "Uploads multiple files into the apartment gallery and ignores duplicates "
+        "that already exist for the same apartment."
+    ),
+    dependencies=[Depends(require_admin_token)],
+)
+async def admin_upload_apartment_images_bulk(
+    apartment_id: str,
+    request: Request,
+    session: Annotated[Session, Depends(get_session)],
+    files: Annotated[list[UploadFile], File(...)],
+) -> ApartmentImageBulkUploadResponse:
+    if not files:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No files provided.")
+
+    apartment = get_apartment_or_404(session, apartment_id)
+    uploaded_images: list[ApartmentImage] = []
+    skipped_images: list[ApartmentImage] = []
+
+    for file in files:
+        image, created = await store_apartment_gallery_image(
+            session,
+            apartment=apartment,
+            file=file,
+            set_as_guest_background=False,
+        )
+        if created:
+            uploaded_images.append(image)
+        else:
+            skipped_images.append(image)
+
+    refreshed = get_apartment_or_404(session, apartment_id)
+    return ApartmentImageBulkUploadResponse(
+        uploaded=[
+            apartment_image_to_summary(
+                image,
+                request=request,
+                is_guest_background=(refreshed.guest_background_image_id == image.id),
+            )
+            for image in uploaded_images
+        ],
+        skipped_existing=[
+            apartment_image_to_summary(
+                image,
+                request=request,
+                is_guest_background=(refreshed.guest_background_image_id == image.id),
+            )
+            for image in skipped_images
+        ],
     )
 
 

@@ -239,9 +239,47 @@ th {
   color: #8f3b1f;
 }
 
+.gallery-dropzone {
+  position: relative;
+  border: 1px dashed #87bda8;
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: #2b5c4f;
+  background: #eefaf4;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.gallery-dropzone-badge {
+  margin-left: 8px;
+  display: inline-block;
+  min-width: 24px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #2b5c4f;
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.gallery-dropzone.is-dragover {
+  background: #dff6ea;
+  border-color: #2b5c4f;
+  color: #1f4339;
+}
+
 .gallery-cell {
   position: relative;
   width: 84px;
+  overflow: visible;
+  z-index: 1;
+}
+
+.gallery-cell:hover,
+.gallery-cell:focus-within {
+  z-index: 120;
 }
 
 .gallery-thumb {
@@ -256,9 +294,9 @@ th {
 .gallery-hover-preview {
   position: absolute;
   left: 86px;
-  top: -8px;
-  width: 280px;
-  padding: 6px;
+  top: -12px;
+  width: 420px;
+  padding: 8px;
   border-radius: 10px;
   border: 1px solid var(--line);
   background: #fff;
@@ -267,12 +305,12 @@ th {
   transform: translateY(4px);
   transition: opacity 140ms ease, transform 140ms ease;
   pointer-events: none;
-  z-index: 40;
+  z-index: 999;
 }
 
 .gallery-hover-image {
   width: 100%;
-  max-height: 220px;
+  max-height: 320px;
   object-fit: contain;
   border-radius: 6px;
   display: block;
@@ -282,6 +320,17 @@ th {
 .gallery-cell:focus-within .gallery-hover-preview {
   opacity: 1;
   transform: translateY(0);
+}
+
+@media (max-width: 900px) {
+  .gallery-hover-preview {
+    width: 300px;
+    left: 72px;
+  }
+
+  .gallery-hover-image {
+    max-height: 240px;
+  }
 }
 
 .status-pill {

@@ -1,4 +1,4 @@
-import type { FormEvent } from "react";
+import type { DragEvent, FormEvent } from "react";
 import { Fragment, useEffect, useState } from "react";
 
 import { QrModal } from "../components/QrModal";
@@ -116,6 +116,8 @@ export function ApartmentsPage() {
   const [removingBackgroundApartmentId, setRemovingBackgroundApartmentId] = useState<string | null>(null);
   const [imagesByApartment, setImagesByApartment] = useState<Record<string, ApartmentImage[]>>({});
   const [expandedGalleryApartmentId, setExpandedGalleryApartmentId] = useState<string | null>(null);
+  const [dragOverApartmentId, setDragOverApartmentId] = useState<string | null>(null);
+  const [dragOverFileCount, setDragOverFileCount] = useState(0);
   const [reorderingApartmentId, setReorderingApartmentId] = useState<string | null>(null);
   const [deletingImageId, setDeletingImageId] = useState<number | null>(null);
   const [settingBackgroundImageId, setSettingBackgroundImageId] = useState<number | null>(null);
@@ -289,26 +291,39 @@ export function ApartmentsPage() {
     }
   };
 
-  const onUploadGuestBackground = async (apartmentId: string, file: File | null) => {
-    if (!file) {
+  const onUploadGuestBackground = async (apartmentId: string, files: File[]) => {
+    if (!files.length) {
       return;
     }
 
-    if (file.size > MAX_GUEST_BACKGROUND_BYTES) {
-      setMessage("Image is too large. Maximum allowed size is 5 MB.");
-      return;
+    for (const file of files) {
+      if (file.size > MAX_GUEST_BACKGROUND_BYTES) {
+        setMessage(`Image ${file.name} is too large. Maximum allowed size is 5 MB.`);
+        return;
+      }
     }
 
     setUploadingBackgroundApartmentId(apartmentId);
     setMessage("");
     try {
-      await api.uploadApartmentImage(getAdminToken(), apartmentId, file);
+      const result = await api.uploadApartmentImages(getAdminToken(), apartmentId, files);
       await load();
       if (expandedGalleryApartmentId === apartmentId) {
         const rows = await api.listApartmentImages(getAdminToken(), apartmentId);
         setImagesByApartment((prev) => ({ ...prev, [apartmentId]: rows }));
       }
-      setMessage(`Image uploaded for ${apartmentId}.`);
+
+      const uploadedCount = result.uploaded.length;
+      const skippedCount = result.skipped_existing.length;
+      if (uploadedCount > 0 && skippedCount > 0) {
+        setMessage(
+          `${uploadedCount} image(s) uploaded, ${skippedCount} duplicate image(s) ignored for ${apartmentId}.`,
+        );
+      } else if (uploadedCount > 0) {
+        setMessage(`${uploadedCount} image(s) uploaded for ${apartmentId}.`);
+      } else {
+        setMessage(`No new images uploaded. ${skippedCount} duplicate image(s) ignored.`);
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Image upload failed.");
     } finally {
@@ -406,6 +421,39 @@ export function ApartmentsPage() {
     } finally {
       setDeletingImageId(null);
     }
+  };
+
+  const isUploadBlocked = (apartmentId: string) =>
+    deletingApartmentId === apartmentId ||
+    uploadingBackgroundApartmentId === apartmentId ||
+    removingBackgroundApartmentId === apartmentId;
+
+  const onDragUploadOver = (event: DragEvent<HTMLDivElement>, apartmentId: string) => {
+    if (isUploadBlocked(apartmentId)) {
+      return;
+    }
+    event.preventDefault();
+    setDragOverApartmentId(apartmentId);
+    const count = event.dataTransfer.items.length || event.dataTransfer.files.length;
+    setDragOverFileCount(count);
+  };
+
+  const onDragUploadLeave = (apartmentId: string) => {
+    if (dragOverApartmentId === apartmentId) {
+      setDragOverApartmentId(null);
+      setDragOverFileCount(0);
+    }
+  };
+
+  const onDropUpload = async (event: DragEvent<HTMLDivElement>, apartmentId: string) => {
+    event.preventDefault();
+    setDragOverApartmentId(null);
+    setDragOverFileCount(0);
+    if (isUploadBlocked(apartmentId)) {
+      return;
+    }
+    const files = Array.from(event.dataTransfer.files ?? []);
+    await onUploadGuestBackground(apartmentId, files);
   };
 
   return (
@@ -656,26 +704,37 @@ export function ApartmentsPage() {
                     <label>
                       <input
                         type="file"
+                        multiple
                         accept="image/png,image/jpeg,image/webp"
-                        onChange={(event) =>
-                          void onUploadGuestBackground(apartment.apartmentId, event.target.files?.[0] ?? null)
-                        }
-                        disabled={
-                          deletingApartmentId === apartment.apartmentId ||
-                          uploadingBackgroundApartmentId === apartment.apartmentId ||
-                          removingBackgroundApartmentId === apartment.apartmentId
-                        }
+                        onChange={(event) => {
+                          const files = Array.from(event.target.files ?? []);
+                          event.currentTarget.value = "";
+                          void onUploadGuestBackground(apartment.apartmentId, files);
+                        }}
+                        disabled={isUploadBlocked(apartment.apartmentId)}
                       />
                     </label>
+                    <div
+                      className={`gallery-dropzone ${
+                        dragOverApartmentId === apartment.apartmentId ? "is-dragover" : ""
+                      }`}
+                      onDragOver={(event) => onDragUploadOver(event, apartment.apartmentId)}
+                      onDragEnter={(event) => onDragUploadOver(event, apartment.apartmentId)}
+                      onDragLeave={() => onDragUploadLeave(apartment.apartmentId)}
+                      onDrop={(event) => {
+                        void onDropUpload(event, apartment.apartmentId);
+                      }}
+                    >
+                      Drop images here
+                      {dragOverApartmentId === apartment.apartmentId && dragOverFileCount > 0 ? (
+                        <span className="gallery-dropzone-badge">+{dragOverFileCount}</span>
+                      ) : null}
+                    </div>
                     {apartment.hasGuestBackground ? (
                       <button
                         type="button"
                         onClick={() => void onDeleteGuestBackground(apartment.apartmentId)}
-                        disabled={
-                          deletingApartmentId === apartment.apartmentId ||
-                          uploadingBackgroundApartmentId === apartment.apartmentId ||
-                          removingBackgroundApartmentId === apartment.apartmentId
-                        }
+                        disabled={isUploadBlocked(apartment.apartmentId)}
                       >
                         {removingBackgroundApartmentId === apartment.apartmentId ? "Removing image..." : "Remove Image"}
                       </button>

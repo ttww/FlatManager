@@ -722,6 +722,40 @@ def test_admin_can_manage_apartment_gallery_images(tmp_path: Path) -> None:
     assert isinstance(guest_bg_url_response.json()["image_url"], str)
 
 
+def test_admin_bulk_upload_ignores_existing_gallery_images(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+    client = TestClient(app)
+
+    create_response = client.post(
+        "/api/admin/apartments",
+        headers={"X-Admin-Token": settings.admin_token},
+        json={"apartment_id": "apartment-gallery-bulk", "timezone": "UTC"},
+    )
+    assert create_response.status_code == 201
+
+    bulk_response = client.post(
+        "/api/admin/apartments/apartment-gallery-bulk/images/bulk",
+        headers={"X-Admin-Token": settings.admin_token},
+        files=[
+            ("files", ("one.png", b"same-bytes", "image/png")),
+            ("files", ("two.png", b"different-bytes", "image/png")),
+            ("files", ("one-copy.png", b"same-bytes", "image/png")),
+        ],
+    )
+
+    assert bulk_response.status_code == 201
+    payload = bulk_response.json()
+    assert len(payload["uploaded"]) == 2
+    assert len(payload["skipped_existing"]) == 1
+
+    list_response = client.get(
+        "/api/admin/apartments/apartment-gallery-bulk/images",
+        headers={"X-Admin-Token": settings.admin_token},
+    )
+    assert list_response.status_code == 200
+    assert len(list_response.json()) == 2
+
+
 def test_admin_rejects_invalid_apartment_timezone(tmp_path: Path) -> None:
     _prepare_test_db(tmp_path)
     client = TestClient(app)

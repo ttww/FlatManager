@@ -1,16 +1,17 @@
 import type {
-    AccessCodeForm,
-    AccessCodeSummary,
-    AccessLogSummary,
-    AdminDevice,
-    ApartmentImage,
-    ApartmentTimezone,
-    ApartmentUpdatePayload,
-    CommandSummary,
-    DeviceStatus,
-    DeviceUpdatePayload,
-    NewDeviceResponse,
-    RotateDeviceTokenResponse,
+  AccessCodeForm,
+  AccessCodeSummary,
+  AccessLogSummary,
+  AdminDevice,
+  ApartmentImage,
+  ApartmentImageBulkUploadResult,
+  ApartmentTimezone,
+  ApartmentUpdatePayload,
+  CommandSummary,
+  DeviceStatus,
+  DeviceUpdatePayload,
+  NewDeviceResponse,
+  RotateDeviceTokenResponse,
 } from "../types";
 import { clearAdminToken } from "./session";
 
@@ -174,6 +175,21 @@ export const api = {
     formData.append("file", file);
     return request<ApartmentImage>(
       `/api/admin/apartments/${encodeURIComponent(apartmentId)}/images`,
+      adminToken,
+      {
+        method: "POST",
+        body: formData,
+      },
+    );
+  },
+
+  uploadApartmentImages(adminToken: string, apartmentId: string, files: File[]) {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append("files", file);
+    }
+    return request<ApartmentImageBulkUploadResult>(
+      `/api/admin/apartments/${encodeURIComponent(apartmentId)}/images/bulk`,
       adminToken,
       {
         method: "POST",

@@ -229,6 +229,11 @@ class ApartmentImageSummaryResponse(BaseModel):
     updated_at: datetime
 
 
+class ApartmentImageBulkUploadResponse(BaseModel):
+    uploaded: list[ApartmentImageSummaryResponse]
+    skipped_existing: list[ApartmentImageSummaryResponse]
+
+
 class ApartmentImageReorderEntry(BaseModel):
     image_id: int
     sort_order: int = Field(ge=0, le=100000)

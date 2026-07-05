@@ -120,6 +120,11 @@ export type ApartmentImage = {
   updated_at: string;
 };
 
+export type ApartmentImageBulkUploadResult = {
+  uploaded: ApartmentImage[];
+  skipped_existing: ApartmentImage[];
+};
+
 export type ApartmentUpdatePayload = {
   timezone?: string;
   address_line1?: string | null;
