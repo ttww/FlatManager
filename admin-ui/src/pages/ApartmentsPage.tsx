@@ -84,7 +84,19 @@ function summarizeApartments(
   return [...byApartment.values()].sort((left, right) => left.apartmentId.localeCompare(right.apartmentId));
 }
 
+function withAdminToken(url: string, adminToken: string): string {
+  try {
+    const parsed = new URL(url, window.location.origin);
+    parsed.searchParams.set("admin_token", adminToken);
+    return parsed.toString();
+  } catch {
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}admin_token=${encodeURIComponent(adminToken)}`;
+  }
+}
+
 export function ApartmentsPage() {
+  const adminToken = getAdminToken();
   const [apartments, setApartments] = useState<ApartmentSummary[]>([]);
   const [newApartmentId, setNewApartmentId] = useState("");
   const [newTimezone, setNewTimezone] = useState("UTC");
@@ -701,12 +713,19 @@ export function ApartmentsPage() {
                         <tbody>
                           {(imagesByApartment[apartment.apartmentId] ?? []).map((image, index, all) => (
                             <tr key={image.id}>
-                              <td>
+                              <td className="gallery-cell">
                                 <img
-                                  src={image.image_url}
+                                  src={withAdminToken(image.image_url, adminToken)}
                                   alt={image.original_filename}
-                                  style={{ width: 72, height: 48, objectFit: "cover", borderRadius: 6 }}
+                                  className="gallery-thumb"
                                 />
+                                <div className="gallery-hover-preview" role="tooltip" aria-hidden="true">
+                                  <img
+                                    src={withAdminToken(image.image_url, adminToken)}
+                                    alt={image.original_filename}
+                                    className="gallery-hover-image"
+                                  />
+                                </div>
                               </td>
                               <td>{image.original_filename}</td>
                               <td>{index + 1}</td>

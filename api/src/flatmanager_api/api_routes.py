@@ -10,7 +10,17 @@ from secrets import token_urlsafe
 from typing import Annotated
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, File, Header, HTTPException, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import func
@@ -246,12 +256,14 @@ def device_to_summary(device: Device, apartment_timezone: str) -> AdminDeviceSum
 def require_admin_token(
     request: Request,
     x_admin_token: Annotated[str | None, Header()] = None,
+    admin_token: Annotated[str | None, Query()] = None,
 ) -> None:
     client_ip = request.client.host if request.client else "unknown"
     if client_ip in settings.trusted_ip_set():
         return
 
-    if not x_admin_token or x_admin_token != settings.admin_token:
+    provided_token = x_admin_token or admin_token
+    if not provided_token or provided_token != settings.admin_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin token")
 
 
