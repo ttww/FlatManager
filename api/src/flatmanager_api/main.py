@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +12,17 @@ from .logging_config import configure_logging
 from .settings import settings
 
 configure_logging(settings.logging_timezone)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    init_db()
+    try:
+        yield
+    finally:
+        # Wake long-poll waiters so shutdown does not block on poll timeout.
+        get_queue_manager().notify_all()
+
 
 openapi_tags = [
     {
@@ -50,6 +63,7 @@ app = FastAPI(
     redoc_url=settings.redoc_url,
     openapi_url=settings.openapi_url,
     openapi_tags=openapi_tags,
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -60,17 +74,6 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
-
-
-@app.on_event("startup")
-def on_startup() -> None:
-    init_db()
-
-
-@app.on_event("shutdown")
-def on_shutdown() -> None:
-    # Wake long-poll waiters so shutdown does not block on poll timeout.
-    get_queue_manager().notify_all()
 
 
 @app.get("/health", tags=["system"])

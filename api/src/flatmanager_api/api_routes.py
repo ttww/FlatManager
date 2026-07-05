@@ -23,7 +23,7 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import func
+from sqlalchemy import func, update
 from sqlmodel import Session, select
 
 from .db import get_session
@@ -255,17 +255,19 @@ def device_to_summary(device: Device, apartment_timezone: str) -> AdminDeviceSum
 
 
 def require_admin_token(
-    request: Request,
     x_admin_token: Annotated[str | None, Header()] = None,
-    admin_token: Annotated[str | None, Query()] = None,
 ) -> None:
-    client_ip = request.client.host if request.client else "unknown"
-    if client_ip in settings.trusted_ip_set():
-        return
-
-    provided_token = x_admin_token or admin_token
-    if not provided_token or provided_token != settings.admin_token:
+    if not is_valid_admin_token(x_admin_token):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin token")
+
+
+def is_valid_admin_token(provided_token: str | None) -> bool:
+    if not provided_token:
+        return False
+    return hmac.compare_digest(
+        provided_token.encode("utf-8"),
+        settings.admin_token.encode("utf-8"),
+    )
 
 
 def token_fingerprint(token: str) -> str:
@@ -860,13 +862,19 @@ async def admin_upload_apartment_images_bulk(
     tags=["apartments"],
     summary="Get apartment image file",
     description="Returns the binary file for an apartment gallery image.",
-    dependencies=[Depends(require_admin_token)],
 )
 def admin_get_apartment_image_file(
     apartment_id: str,
     image_id: int,
     session: Annotated[Session, Depends(get_session)],
+    x_admin_token: Annotated[str | None, Header()] = None,
+    # TODO(review): Query token is deprecated and remains only for browser media GET requests
+    # where setting custom headers is not practical for plain <img> usage.
+    admin_token: Annotated[str | None, Query()] = None,
 ) -> FileResponse:
+    if not is_valid_admin_token(x_admin_token or admin_token):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin token")
+
     image = session.get(ApartmentImage, image_id)
     if image is None or image.apartment_id != apartment_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
@@ -1543,8 +1551,24 @@ def guest_open(
         session.commit()
         return GuestOpenResponse(status="denied", message=NEUTRAL_DENIED_MESSAGE)
 
-    access_code.used_count += 1
-    access_code.updated_at = now
+    update_result = session.exec(
+        update(AccessCode)
+        .where(AccessCode.id == access_code.id)
+        .where(AccessCode.used_count < AccessCode.max_uses)
+        .values(used_count=AccessCode.used_count + 1, updated_at=now)
+    )
+    if update_result.rowcount != 1:
+        log_access_event(
+            session,
+            apartment_id=payload.apartment_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            access_code_id=access_code.id,
+            result="denied",
+            reason="validation_failed",
+        )
+        session.commit()
+        return GuestOpenResponse(status="denied", message=NEUTRAL_DENIED_MESSAGE)
 
     command = DoorCommand(
         device_id=device.id,

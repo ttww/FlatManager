@@ -6,6 +6,16 @@
 - Forward traffic to FastAPI service bound to localhost.
 - Keep API reachable only through HTTPS in production.
 
+## Forwarded client IP handling
+
+The API container starts uvicorn with `--proxy-headers` and
+`--forwarded-allow-ips ${FORWARDED_ALLOW_IPS}`.
+
+- Set `FORWARDED_ALLOW_IPS` to the exact reverse proxy IP or subnet only.
+- Default is `127.0.0.1` for local reverse-proxy setups.
+- Never use `*` on public networks, otherwise clients can spoof `X-Forwarded-For`
+    and bypass correct per-IP rate-limit/audit behavior.
+
 ## Long polling endpoint
 
 Recommended NGINX location configuration for the device long-poll endpoint:
@@ -18,6 +28,18 @@ location /api/device/wait-command {
     proxy_buffering off;
 }
 ```
+
+## Long-poll queue scaling constraint
+
+`DeviceQueueManager` is in-process and uses `asyncio.Event` objects.
+
+- Run exactly one uvicorn worker for this API process.
+- Do not scale this endpoint horizontally without redesigning signaling.
+- For multi-worker or multi-replica deployments, replace signaling with DB polling
+    or an external pub/sub backend (for example Redis).
+
+In short: with this implementation, one API process and one uvicorn worker is a
+hard requirement for immediate command wake-ups.
 
 ## Upload size limit for apartment background images
 

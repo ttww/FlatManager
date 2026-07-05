@@ -413,7 +413,19 @@ def test_admin_endpoints_require_token(tmp_path: Path) -> None:
     assert response.status_code == 401
 
 
-def test_trusted_ip_can_access_admin_without_token(tmp_path: Path) -> None:
+def test_admin_query_token_is_rejected_for_non_media_endpoints(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+    client = TestClient(app)
+
+    response = client.get(
+        "/api/admin/devices/status",
+        params={"admin_token": settings.admin_token},
+    )
+
+    assert response.status_code == 401
+
+
+def test_trusted_ip_cannot_access_admin_without_token(tmp_path: Path) -> None:
     _prepare_test_db(tmp_path)
     previous_allowlist = settings.trusted_ip_allowlist
     settings.trusted_ip_allowlist = "testclient"
@@ -421,7 +433,7 @@ def test_trusted_ip_can_access_admin_without_token(tmp_path: Path) -> None:
     try:
         client = TestClient(app)
         response = client.get("/api/admin/devices/status")
-        assert response.status_code == 200
+        assert response.status_code == 401
     finally:
         settings.trusted_ip_allowlist = previous_allowlist
 
@@ -706,6 +718,13 @@ def test_admin_can_manage_apartment_gallery_images(tmp_path: Path) -> None:
     )
     assert list_response.status_code == 200
     assert len(list_response.json()) == 1
+    image_file_url = list_response.json()[0]["image_url"]
+
+    media_query_response = client.get(
+        image_file_url,
+        params={"admin_token": settings.admin_token},
+    )
+    assert media_query_response.status_code == 200
 
     set_bg_response = client.post(
         f"/api/admin/apartments/apartment-gallery/images/{image_id}/set-guest-background",
@@ -774,6 +793,40 @@ def test_admin_rejects_invalid_apartment_timezone(tmp_path: Path) -> None:
     )
 
     assert response.status_code == 400
+
+
+def test_single_use_access_code_cannot_be_used_twice(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+
+    with Session(get_engine()) as session:
+        access_code = AccessCode(
+            apartment_id="apartment-one-use",
+            code_hash=hash_access_code("apartment-one-use", "123456"),
+            valid_from=_iso_now(-3600),
+            valid_until=_iso_now(3600),
+            max_uses=1,
+            used_count=0,
+            active=True,
+        )
+        session.add(access_code)
+        session.commit()
+        _seed_device(session, apartment_id="apartment-one-use", token="device-token-one-use")
+
+    client = TestClient(app)
+
+    first = client.post(
+        "/api/guest/open",
+        json={"apartment_id": "apartment-one-use", "code": "123456"},
+    )
+    second = client.post(
+        "/api/guest/open",
+        json={"apartment_id": "apartment-one-use", "code": "123456"},
+    )
+
+    assert first.status_code == 200
+    assert first.json()["status"] == "accepted"
+    assert second.status_code == 200
+    assert second.json()["status"] == "denied"
 
 
 def test_admin_can_delete_apartment_without_dependencies(tmp_path: Path) -> None:

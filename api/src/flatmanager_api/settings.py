@@ -1,9 +1,11 @@
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_DB_PATH = "./data/flatmanager.db"
+DEFAULT_SECURITY_PEPPER = "flatmanager-dev-change-me"
+DEFAULT_ADMIN_TOKEN = "flatmanager-admin-dev-token"
 
 
 class Settings(BaseSettings):
@@ -20,11 +22,11 @@ class Settings(BaseSettings):
 
     database_url: str = Field(default=f"sqlite:///{DEFAULT_DB_PATH}")
 
-    security_pepper: str = Field(default="flatmanager-dev-change-me")
+    security_pepper: str = Field(default=DEFAULT_SECURITY_PEPPER)
     code_hash_algorithm: str = Field(default="sha256")
     token_hash_algorithm: str = Field(default="sha256")
 
-    admin_token: str = Field(default="flatmanager-admin-dev-token")
+    admin_token: str = Field(default=DEFAULT_ADMIN_TOKEN)
 
     command_expiration_seconds: int = Field(default=10)
     default_open_duration_ms: int = Field(default=1500)
@@ -60,7 +62,7 @@ class Settings(BaseSettings):
     apartment_gallery_dir: str = Field(default="./data/apartment-gallery")
     apartment_gallery_max_images: int = Field(default=20)
 
-    trusted_ip_allowlist: str = Field(default="109.90.33.191")
+    trusted_ip_allowlist: str = Field(default="")
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -85,6 +87,23 @@ class Settings(BaseSettings):
             for candidate in self.trusted_ip_allowlist.split(",")
             if candidate.strip()
         }
+
+    @model_validator(mode="after")
+    def validate_non_dev_secrets(self) -> "Settings":
+        if self.app_env == "development":
+            return self
+
+        if self.admin_token == DEFAULT_ADMIN_TOKEN:
+            raise ValueError(
+                "Invalid configuration for APP_ENV != development: "
+                "ADMIN_TOKEN must not use the default value."
+            )
+        if self.security_pepper == DEFAULT_SECURITY_PEPPER:
+            raise ValueError(
+                "Invalid configuration for APP_ENV != development: "
+                "SECURITY_PEPPER must not use the default value."
+            )
+        return self
 
 
 settings = Settings()

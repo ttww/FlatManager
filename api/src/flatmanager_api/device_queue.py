@@ -3,6 +3,10 @@ Per-device async command notification queue.
 
 Provides lightweight signaling to wake waiting devices when commands arrive,
 without storing command payloads (DB remains source of truth).
+
+Operational constraint: this signaling is process-local. Run exactly one uvicorn
+worker for this API process. Multi-worker or multi-replica deployments require
+DB polling or an external pub/sub backend (for example Redis).
 """
 
 import asyncio
@@ -49,6 +53,8 @@ class DeviceQueueManager:
         except TimeoutError:
             return False
         finally:
+            # Multi-waiter caveat: clear() can consume a signal for another waiter.
+            # The system assumes at most one active long-poll connection per device.
             # Reset for next waiter(s)
             event.clear()
 
