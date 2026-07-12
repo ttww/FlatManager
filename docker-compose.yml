@@ -29,7 +29,7 @@ services:
         VITE_BASE_PATH: ${ADMIN_BASE_PATH:-/admin/}
     image: ${IMAGE_REPO:-flatmanager}/admin-ui:${TAG:-latest}
     ports:
-      - "8080:80"
+      - "7979:80"
     depends_on:
       - api
     restart: unless-stopped
