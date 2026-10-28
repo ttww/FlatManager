@@ -211,6 +211,43 @@ LOCKOUT_FAILED_ATTEMPTS_THRESHOLD=5
 
 See `api/.env.example` for all options.
 
+### Separate domains for Admin and Guest
+
+Admin UI and Guest UI can run on different hostnames, e.g. `https://admin.example.com/admin/` and `https://guest.example.com/guest/`.
+
+- The `VITE_*` variables are build-time arguments baked into the UIs, not runtime variables. Rebuild after changing them.
+- Leave `VITE_API_BASE_URL` empty so each UI calls the API on its own origin (no CORS needed). `make prod-upd` does this.
+- Set `VITE_GUEST_BASE_URL` (default in the `Makefile`) to the guest host; it is used for the QR codes in the admin dashboard:
+
+```bash
+VITE_GUEST_BASE_URL=https://guest.example.com make prod-upd
+```
+
+The guest host's Nginx must proxy the guest UI and **only** the guest API (keeps `/api/admin/` unreachable there):
+
+```nginx
+location /guest/ {
+    proxy_pass http://127.0.0.1:8081;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+location /api/guest/ {
+    proxy_pass http://127.0.0.1:8000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+Notes:
+- `docker-compose.yml` binds the container ports to `127.0.0.1`, so they are only reachable through the host Nginx.
+- The API trusts `X-Forwarded-*` headers only from `FORWARDED_ALLOW_IPS` (default `127.0.0.1`). If Nginx reaches the container via the Docker bridge, set it in `api/.env` to that gateway address (e.g. `172.18.0.1`); otherwise signed background-image URLs are generated with `http://`. Avoid `*` unless the API port is not reachable from outside.
+- If you set `VITE_API_BASE_URL` to a different host instead, add the UI origins to `CORS_ALLOWED_ORIGINS` in `api/.env`.
+
 ---
 
 ## Device Setup (ESP32-S2 in esp/)

@@ -14,7 +14,7 @@ services:
       OPENAPI_URL: ${OPENAPI_URL:-/api/openapi.json}
       DATABASE_URL: sqlite:///./data/flatmanager.db
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./api/data:/app/data
     restart: unless-stopped
@@ -29,7 +29,7 @@ services:
         VITE_BASE_PATH: ${ADMIN_BASE_PATH:-/admin/}
     image: ${IMAGE_REPO:-flatmanager}/admin-ui:${TAG:-latest}
     ports:
-      - "8080:80"
+      - "127.0.0.1:8080:80"
     depends_on:
       - api
     restart: unless-stopped
@@ -43,7 +43,7 @@ services:
         VITE_BASE_PATH: ${GUEST_BASE_PATH:-/guest/}
     image: ${IMAGE_REPO:-flatmanager}/guest-ui:${TAG:-latest}
     ports:
-      - "8081:80"
+      - "127.0.0.1:8081:80"
     depends_on:
       - api
     restart: unless-stopped
