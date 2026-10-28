@@ -2,7 +2,7 @@
 
 This guide explains the normal day-to-day workflow for both:
 
-- Admin users (`http://localhost:8080`)
+- Admin users (`http://localhost:7979`)
 - Guest users (`http://localhost:8081`)
 
 It is written as a step-by-step quick guide with screenshots.
@@ -11,7 +11,7 @@ It is written as a step-by-step quick guide with screenshots.
 
 ### 1.1 Login to Admin UI
 
-1. Open `http://localhost:8080`.
+1. Open `http://localhost:7979`.
 2. Enter your admin token.
 3. Click **Continue**.
 
@@ -291,6 +291,6 @@ Both files represent the same v3 design suitable for compact mounting on standar
 
 ## 5. URL Overview
 
-- Admin UI: `http://localhost:8080`
+- Admin UI: `http://localhost:7979`
 - Guest UI: `http://localhost:8081`
 - API base: `http://localhost:8000`
