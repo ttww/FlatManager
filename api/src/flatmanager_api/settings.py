@@ -1,7 +1,7 @@
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_DB_PATH = "./data/flatmanager.db"
@@ -66,6 +66,9 @@ class Settings(BaseSettings):
     trusted_ip_allowlist: str = Field(default="")
 
     chatgpt_guest_public_url: str = ""
+    chatgpt_guest_mcp_url: str = ""
+    chatgpt_guest_mtls_intermediate: str = ""
+    chatgpt_guest_mtls_proxy_token: SecretStr = SecretStr("")
     chatgpt_guest_apartment_id: str = "Luna"
     chatgpt_guest_client_id: str = "https://chatgpt.com/oauth/client.json"
     chatgpt_guest_redirect_uri: str = "https://chatgpt.com/connector_platform_oauth_redirect"
@@ -94,21 +97,36 @@ class Settings(BaseSettings):
             if candidate.strip()
         }
 
+    @field_validator("chatgpt_guest_public_url", "chatgpt_guest_mcp_url")
+    @classmethod
+    def validate_chatgpt_guest_origin(cls, value: str) -> str:
+        if not value:
+            return value
+        origin = urlsplit(value)
+        if (
+            origin.scheme != "https"
+            or not origin.hostname
+            or origin.username is not None
+            or origin.path
+            or origin.query
+            or origin.fragment
+        ):
+            raise ValueError("The URL must be an HTTPS origin without a trailing slash.")
+        return value
+
     @model_validator(mode="after")
     def validate_non_dev_secrets(self) -> "Settings":
-        if self.chatgpt_guest_public_url:
-            origin = urlsplit(self.chatgpt_guest_public_url)
-            if (
-                origin.scheme != "https"
-                or not origin.hostname
-                or origin.username is not None
-                or origin.path
-                or origin.query
-                or origin.fragment
-            ):
-                raise ValueError("CHATGPT_GUEST_PUBLIC_URL must be an HTTPS origin.")
-            if self.security_pepper == DEFAULT_SECURITY_PEPPER:
-                raise ValueError("CHATGPT_GUEST_PUBLIC_URL requires a non-default SECURITY_PEPPER.")
+        if self.chatgpt_guest_mcp_url and not self.chatgpt_guest_public_url:
+            raise ValueError("CHATGPT_GUEST_MCP_URL requires CHATGPT_GUEST_PUBLIC_URL.")
+        proxy_token = self.chatgpt_guest_mtls_proxy_token.get_secret_value()
+        if self.chatgpt_guest_mtls_intermediate or proxy_token:
+            if not self.chatgpt_guest_mtls_intermediate or len(proxy_token) < 32:
+                raise ValueError(
+                    "MCP mTLS requires an intermediate certificate and a proxy token "
+                    "of at least 32 characters."
+                )
+        if self.chatgpt_guest_public_url and self.security_pepper == DEFAULT_SECURITY_PEPPER:
+            raise ValueError("CHATGPT_GUEST_PUBLIC_URL requires a non-default SECURITY_PEPPER.")
 
         if self.app_env == "development":
             return self

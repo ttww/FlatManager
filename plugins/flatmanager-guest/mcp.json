@@ -3,7 +3,7 @@
   "mcpServers": {
     "flatmanager-guest": {
       "type": "streamable-http",
-      "url": "https://www.apartment-luna.cz/api/guest/chatgpt/mcp",
+      "url": "https://mcp.apartment-luna.cz/api/guest/chatgpt/mcp",
       "extensions": {
         "com.openai": {
           "auth": {

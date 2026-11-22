@@ -2,10 +2,16 @@ import base64
 import hashlib
 import re
 from datetime import timedelta
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, quote_from_bytes, urlsplit
 
 import pytest
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.serialization import Encoding
+from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 from sqlmodel import Session, select
 
 from flatmanager_api.db import get_engine, init_db, reset_engine_cache
@@ -142,8 +148,64 @@ def test_public_faq_and_widget_metadata(guest_client):
     assert response.status_code == 400
 
 
-def test_link_open_poll_and_revoke(guest_client):
+def test_mcp_requires_verified_proxy_and_openai_certificate(guest_client, monkeypatch, tmp_path):
+    key = ec.generate_private_key(ec.SECP256R1())
+    issuer_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Test MCP issuing CA")])
+    now = utc_now()
+    template = (
+        x509.CertificateBuilder()
+        .issuer_name(issuer_name)
+        .not_valid_before(now - timedelta(hours=1))
+        .not_valid_after(now + timedelta(hours=1))
+    )
+    intermediate = (
+        template.subject_name(issuer_name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+        .sign(key, hashes.SHA256())
+    )
+    intermediate_path = tmp_path / "intermediate.pem"
+    intermediate_path.write_bytes(intermediate.public_bytes(Encoding.PEM))
+    token = "test-proxy-token-" * 3
+    monkeypatch.setattr(settings, "chatgpt_guest_mtls_intermediate", str(intermediate_path))
+    monkeypatch.setattr(settings, "chatgpt_guest_mtls_proxy_token", SecretStr(token))
+
+    assert guest_client.get(RESOURCE_METADATA_PATH).status_code == 200
+    for dns_name, proxy_token, status in (
+        ("mtls.prod.connectors.openai.com", "", 403),
+        ("not-openai.test", token, 403),
+        ("mtls.prod.connectors.openai.com", token, 200),
+    ):
+        leaf = (
+            template.subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Test leaf")]))
+            .public_key(ec.generate_private_key(ec.SECP256R1()).public_key())
+            .serial_number(x509.random_serial_number())
+            .add_extension(x509.SubjectAlternativeName([x509.DNSName(dns_name)]), critical=False)
+            .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH]), critical=False)
+            .sign(key, hashes.SHA256())
+        )
+        response = guest_client.post(
+            MCP_PATH,
+            headers={
+                "X-FlatManager-mTLS-Proxy-Token": proxy_token,
+                "X-FlatManager-mTLS-Client-Cert": quote_from_bytes(leaf.public_bytes(Encoding.PEM)),
+            },
+            json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+        )
+        assert response.status_code == status, response.text
+
+
+def test_link_open_poll_and_revoke(guest_client, monkeypatch):
     client = guest_client
+    mcp_origin = "https://mcp.luna.test"
+    monkeypatch.setattr(settings, "chatgpt_guest_mcp_url", mcp_origin)
+    metadata = client.get(mcp_origin + RESOURCE_METADATA_PATH).json()
+    assert metadata["resource"] == mcp_origin + MCP_PATH
+    assert metadata["authorization_servers"] == [ORIGIN + PREFIX]
+    challenge = tool(client, "show_luna_door_control")["_meta"]["mcp/www_authenticate"][0]
+    assert f'resource_metadata="{mcp_origin}{RESOURCE_METADATA_PATH}"' in challenge
+
     token = connect(client)
     card = tool(client, "show_luna_door_control", token=token)
     ticket = card["_meta"]["ticket"]

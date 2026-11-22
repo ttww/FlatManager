@@ -69,8 +69,13 @@ def issuer() -> str:
     return public_origin() + PREFIX
 
 
+def mcp_origin() -> str:
+    origin = public_origin()
+    return settings.chatgpt_guest_mcp_url or origin
+
+
 def resource_url() -> str:
-    return public_origin() + MCP_PATH
+    return mcp_origin() + MCP_PATH
 
 
 @router.get(RESOURCE_METADATA_PATH)

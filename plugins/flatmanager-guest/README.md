@@ -12,22 +12,52 @@ The MCP adapter runs in the existing FastAPI application. For staging, use a
 separate database, a test access code, and a test device.
 
 1. Set the values from `api/.env.example` in `api/.env`.
-   `CHATGPT_GUEST_PUBLIC_URL` is the HTTPS origin without a trailing slash.
-   This setting enables the guest integration and requires a non-default
-   `SECURITY_PEPPER`. `CHATGPT_GUEST_APARTMENT_ID` must match the apartment ID
-   in FlatManager. Keep the existing pepper when using an existing database.
-2. Proxy `/api/guest/chatgpt/` to FastAPI as you do for the rest of the guest
-   API. Add these two exact Nginx locations to the server block for the same
-   HTTPS origin. Keep the other client and device routes separate.
+   Set `CHATGPT_GUEST_PUBLIC_URL=https://www.apartment-luna.cz` for the OAuth
+   issuer, guest sign-in, and browser fallback. Set
+   `CHATGPT_GUEST_MCP_URL=https://mcp.apartment-luna.cz` for the MCP origin.
+   Omit trailing slashes. If the MCP origin is unset, it defaults to the public
+   origin. Enabling the guest integration requires a non-default
+   `SECURITY_PEPPER`. Keep the existing pepper when using an existing database.
+   `CHATGPT_GUEST_APARTMENT_ID` must match the apartment ID in FlatManager.
+2. Route `/api/guest/chatgpt/authorize` and `/api/guest/chatgpt/token` to
+   FastAPI through the public guest API. On the MCP host, expose the OAuth
+   protected-resource metadata.
 
    ```nginx
    location = /.well-known/oauth-protected-resource/api/guest/chatgpt/mcp {
        proxy_pass http://127.0.0.1:8000;
    }
+   ```
+
+   On the public OAuth host, expose the authorization server metadata.
+
+   ```nginx
    location = /.well-known/oauth-authorization-server/api/guest/chatgpt {
        proxy_pass http://127.0.0.1:8000;
    }
    ```
+
+   Keep the MCP route blocked on the other public hosts. On the dedicated
+   host, configure Nginx to verify the OpenAI certificate chain and require
+   `$ssl_client_verify` to be `SUCCESS` for `/api/guest/chatgpt/mcp`. Keep the
+   protected-resource metadata publicly accessible.
+
+   Set `CHATGPT_GUEST_MTLS_INTERMEDIATE` to the path to the official OpenAI
+   Connectors intermediate certificate as seen by the API process. With the
+   default Docker volume, `./api/data/openai-connectors-mtls-ca.pem` on the
+   host is `/app/data/openai-connectors-mtls-ca.pem` in the container.
+   Generate a dedicated random proxy token and set the same value in
+   `CHATGPT_GUEST_MTLS_PROXY_TOKEN` and in a private Nginx configuration file.
+   In the certificate-protected MCP location, set the following upstream
+   headers so Nginx overwrites any client-supplied values:
+
+   ```nginx
+   proxy_set_header X-FlatManager-MTLS-Client-Cert $ssl_client_escaped_cert;
+   proxy_set_header X-FlatManager-MTLS-Proxy-Token "<private proxy token>";
+   ```
+
+   Keep the API listener private and the proxy token out of logs and version
+   control. Rotate the token independently of guest access codes.
 
    Configure the forwarding headers and trusted proxy as for the existing
    guest API. When guests link an access code, FlatManager uses the client IP

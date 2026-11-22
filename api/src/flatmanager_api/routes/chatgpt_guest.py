@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy import update
 
+from ..chatgpt_mtls import require_openai_mtls
 from ..models import ChatGPTGuestGrant, DoorCommand
 from ..settings import settings
 from .chatgpt_guest_auth import (
@@ -22,6 +23,7 @@ from .chatgpt_guest_auth import (
     Database,
     digest,
     get_guest_entitlement,
+    mcp_origin,
     public_origin,
 )
 from .deps import as_utc, utc_now
@@ -145,7 +147,7 @@ def require_connection() -> dict:
         error=True,
         meta={
             "mcp/www_authenticate": [
-                f'Bearer resource_metadata="{public_origin()}{RESOURCE_METADATA_PATH}", '
+                f'Bearer resource_metadata="{mcp_origin()}{RESOURCE_METADATA_PATH}", '
                 f'scope="{SCOPE}", error="invalid_token", '
                 'error_description="Connect your FlatManager guest access"'
             ]
@@ -237,8 +239,9 @@ def call_tool(request: Request, session: Database, name: str, arguments: dict) -
 
 
 async def read_message(request: Request) -> object:
+    require_openai_mtls(request)
     origin = request.headers.get("origin")
-    if origin is not None and origin not in {public_origin(), "https://chatgpt.com"}:
+    if origin is not None and origin not in {mcp_origin(), public_origin(), "https://chatgpt.com"}:
         raise HTTPException(status_code=403, detail="Unsupported request origin")
     if request.headers.get("mcp-protocol-version", PROTOCOL_VERSIONS[0]) not in PROTOCOL_VERSIONS:
         raise HTTPException(status_code=400, detail="Unsupported MCP protocol version")
@@ -318,7 +321,7 @@ def mcp(
                         "text": widget_html(),
                         "_meta": {
                             "ui": {
-                                "domain": public_origin(),
+                                "domain": mcp_origin(),
                                 "csp": {"connectDomains": [], "resourceDomains": []},
                             }
                         },
