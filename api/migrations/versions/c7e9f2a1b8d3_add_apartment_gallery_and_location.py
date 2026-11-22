@@ -49,20 +49,21 @@ def upgrade() -> None:
     op.create_index(op.f("ix_apartment_images_sort_order"), "apartment_images", ["sort_order"], unique=False)
     op.create_index(op.f("ix_apartment_images_storage_filename"), "apartment_images", ["storage_filename"], unique=True)
 
-    op.add_column("apartments", sa.Column("guest_background_image_id", sa.Integer(), nullable=True))
-    op.create_foreign_key(
-        "fk_apartments_guest_background_image_id",
-        "apartments",
-        "apartment_images",
-        ["guest_background_image_id"],
-        ["id"],
-    )
+    with op.batch_alter_table("apartments") as batch:
+        batch.add_column(sa.Column("guest_background_image_id", sa.Integer(), nullable=True))
+        batch.create_foreign_key(
+            "fk_apartments_guest_background_image_id",
+            "apartment_images",
+            ["guest_background_image_id"],
+            ["id"],
+        )
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_constraint("fk_apartments_guest_background_image_id", "apartments", type_="foreignkey")
-    op.drop_column("apartments", "guest_background_image_id")
+    with op.batch_alter_table("apartments") as batch:
+        batch.drop_constraint("fk_apartments_guest_background_image_id", type_="foreignkey")
+        batch.drop_column("guest_background_image_id")
 
     op.drop_index(op.f("ix_apartment_images_storage_filename"), table_name="apartment_images")
     op.drop_index(op.f("ix_apartment_images_sort_order"), table_name="apartment_images")

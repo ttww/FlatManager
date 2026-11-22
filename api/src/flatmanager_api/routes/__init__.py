@@ -3,6 +3,8 @@ from fastapi import APIRouter
 from .access_codes import router as access_codes_router
 from .access_logs import router as access_logs_router
 from .apartments import router as apartments_router
+from .chatgpt_guest import router as chatgpt_guest_router
+from .chatgpt_guest_auth import router as chatgpt_guest_auth_router
 from .commands import router as commands_router
 from .device_agent import router as device_agent_router
 from .devices import router as devices_router
@@ -15,4 +17,6 @@ router.include_router(access_codes_router)
 router.include_router(commands_router)
 router.include_router(access_logs_router)
 router.include_router(guest_router)
+router.include_router(chatgpt_guest_auth_router)
+router.include_router(chatgpt_guest_router)
 router.include_router(device_agent_router)

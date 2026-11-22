@@ -1,0 +1,13 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "flatmanager-guest",
+  "version": "0.1.0",
+  "description": "Informationen zu Apartment Luna und Türöffnung für freigeschaltete Gäste.",
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Apartment Luna – Gast"
+      }
+    }
+  }
+}

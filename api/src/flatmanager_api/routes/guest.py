@@ -1,4 +1,6 @@
 # ruff: noqa: F403,F405
+from datetime import timedelta
+
 from fastapi import APIRouter
 
 from .deps import *
@@ -75,19 +77,8 @@ def guest_open(
             content=GuestOpenResponse(status="denied", message=NEUTRAL_DENIED_MESSAGE).model_dump(),
         )
 
-    code_hash = hash_access_code(payload.apartment_id, payload.code)
     now = utc_now()
-
-    access_code = session.exec(
-        select(AccessCode).where(
-            AccessCode.apartment_id == payload.apartment_id,
-            AccessCode.code_hash == code_hash,
-            AccessCode.active.is_(True),
-            AccessCode.valid_from <= now,
-            AccessCode.valid_until >= now,
-            AccessCode.used_count < AccessCode.max_uses,
-        )
-    ).first()
+    access_code = find_guest_code(session, payload.apartment_id, payload.code, now)
 
     if access_code is None:
         log_access_event(
@@ -101,33 +92,86 @@ def guest_open(
         session.commit()
         return GuestOpenResponse(status="denied", message=NEUTRAL_DENIED_MESSAGE)
 
-    device = session.exec(
-        select(Device).where(Device.apartment_id == payload.apartment_id).order_by(Device.id.asc())
+    return queue_guest_open(session, access_code, ip_address, user_agent)
+
+
+def valid_guest_code_at(now: datetime) -> tuple:
+    return (
+        AccessCode.active.is_(True),
+        AccessCode.valid_from <= now,
+        AccessCode.valid_until >= now,
+        AccessCode.used_count < AccessCode.max_uses,
+    )
+
+
+def find_guest_code(
+    session: Session, apartment_id: str, code: str, now: datetime
+) -> AccessCode | None:
+    return session.exec(
+        select(AccessCode).where(
+            AccessCode.apartment_id == apartment_id,
+            AccessCode.code_hash == hash_access_code(apartment_id, code),
+            *valid_guest_code_at(now),
+        )
     ).first()
 
-    if device is None:
+
+def queue_guest_open(
+    session: Session,
+    access_code: AccessCode,
+    ip_address: str,
+    user_agent: str | None,
+    *,
+    source: str = "guest",
+) -> GuestOpenResponse:
+    apartment_id = access_code.apartment_id
+    now = utc_now()
+    device = session.exec(
+        select(Device).where(Device.apartment_id == apartment_id).order_by(Device.id.asc())
+    ).first()
+
+    if device is None or (
+        source == "chatgpt_guest" and derive_device_status(device.last_seen) == "offline"
+    ):
         log_access_event(
             session,
-            apartment_id=payload.apartment_id,
+            apartment_id=apartment_id,
             ip_address=ip_address,
             user_agent=user_agent,
             access_code_id=access_code.id,
             result="device_offline",
-            reason="device_not_registered",
+            reason="device_not_registered" if device is None else "chatgpt_device_offline",
         )
         session.commit()
+        if source == "chatgpt_guest":
+            return GuestOpenResponse(status="offline", message="The door device is offline.")
         return GuestOpenResponse(status="denied", message=NEUTRAL_DENIED_MESSAGE)
+
+    conditions = [
+        AccessCode.id == access_code.id,
+        AccessCode.apartment_id == apartment_id,
+        AccessCode.code_hash == access_code.code_hash,
+        AccessCode.created_at == access_code.created_at,
+        *valid_guest_code_at(now),
+    ]
+    if source == "chatgpt_guest":
+        recent = select(DoorCommand.id).where(
+            DoorCommand.access_code_id == access_code.id,
+            DoorCommand.source == source,
+            DoorCommand.created_at >= now - timedelta(seconds=3),
+        )
+        conditions.append(~recent.exists())
 
     update_result = session.exec(
         update(AccessCode)
-        .where(AccessCode.id == access_code.id)
-        .where(AccessCode.used_count < AccessCode.max_uses)
+        .where(*conditions)
         .values(used_count=AccessCode.used_count + 1, updated_at=now)
+        .execution_options(synchronize_session=False)
     )
     if update_result.rowcount != 1:
         log_access_event(
             session,
-            apartment_id=payload.apartment_id,
+            apartment_id=apartment_id,
             ip_address=ip_address,
             user_agent=user_agent,
             access_code_id=access_code.id,
@@ -139,11 +183,11 @@ def guest_open(
 
     command = DoorCommand(
         device_id=device.id,
-        apartment_id=payload.apartment_id,
+        apartment_id=apartment_id,
         command="open",
         duration_ms=settings.default_open_duration_ms,
         status="pending",
-        source="guest",
+        source=source,
         access_code_id=access_code.id,
     )
     session.add(command)
@@ -151,7 +195,7 @@ def guest_open(
 
     log_access_event(
         session,
-        apartment_id=payload.apartment_id,
+        apartment_id=apartment_id,
         ip_address=ip_address,
         user_agent=user_agent,
         access_code_id=access_code.id,
@@ -160,12 +204,13 @@ def guest_open(
         reason="accepted",
     )
 
+    device_id, command_id = device.id, command.id
     session.commit()
 
     # Signal device queue that a command is ready
-    get_queue_manager().notify(device.id)
+    get_queue_manager().notify(device_id)
 
-    return GuestOpenResponse(status="accepted", message=SUCCESS_MESSAGE, command_id=command.id)
+    return GuestOpenResponse(status="accepted", message=SUCCESS_MESSAGE, command_id=command_id)
 
 @router.get(
     "/guest/background-url",

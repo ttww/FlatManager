@@ -1,0 +1,13 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "flatmanager-admin",
+  "version": "0.1.0",
+  "description": "Türcodes für berechtigte FlatManager-Admins auflisten, anlegen, ändern und sperren.",
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "FlatManager – Admin"
+      }
+    }
+  }
+}

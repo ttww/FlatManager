@@ -1,3 +1,4 @@
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, field_validator, model_validator
@@ -64,6 +65,11 @@ class Settings(BaseSettings):
 
     trusted_ip_allowlist: str = Field(default="")
 
+    chatgpt_guest_public_url: str = ""
+    chatgpt_guest_apartment_id: str = "Luna"
+    chatgpt_guest_client_id: str = "https://chatgpt.com/oauth/client.json"
+    chatgpt_guest_redirect_uri: str = "https://chatgpt.com/connector_platform_oauth_redirect"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -90,6 +96,20 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_non_dev_secrets(self) -> "Settings":
+        if self.chatgpt_guest_public_url:
+            origin = urlsplit(self.chatgpt_guest_public_url)
+            if (
+                origin.scheme != "https"
+                or not origin.hostname
+                or origin.username is not None
+                or origin.path
+                or origin.query
+                or origin.fragment
+            ):
+                raise ValueError("CHATGPT_GUEST_PUBLIC_URL must be an HTTPS origin.")
+            if self.security_pepper == DEFAULT_SECURITY_PEPPER:
+                raise ValueError("CHATGPT_GUEST_PUBLIC_URL requires a non-default SECURITY_PEPPER.")
+
         if self.app_env == "development":
             return self
 

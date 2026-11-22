@@ -75,6 +75,23 @@ class Device(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class ChatGPTGuestGrant(SQLModel, table=True):
+    __tablename__ = "chatgpt_guest_grants"
+
+    authorization_code_hash: str = Field(primary_key=True, max_length=64)
+    access_code_id: int = Field(index=True)
+    access_code_fingerprint: str = Field(max_length=64)
+    code_challenge: str = Field(max_length=43)
+    client_id: str = Field(max_length=512)
+    redirect_uri: str = Field(max_length=512)
+    resource: str = Field(max_length=512)
+    authorization_expires_at: datetime
+    expires_at: datetime = Field(index=True)
+    token_hash: str | None = Field(default=None, unique=True, max_length=64)
+    open_ticket_hash: str | None = Field(default=None, max_length=64)
+    open_ticket_expires_at: datetime | None = None
+
+
 class DoorCommand(SQLModel, table=True):
     __tablename__ = "door_commands"
 

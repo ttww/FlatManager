@@ -1,0 +1,19 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "flatmanager-guest": {
+      "type": "streamable-http",
+      "url": "https://www.apartment-luna.cz/api/guest/chatgpt/mcp",
+      "extensions": {
+        "com.openai": {
+          "auth": {
+            "type": "mixed",
+            "client": {
+              "mode": "cimd"
+            }
+          }
+        }
+      }
+    }
+  }
+}

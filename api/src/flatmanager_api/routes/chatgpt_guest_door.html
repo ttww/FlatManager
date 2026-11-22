@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apartment Luna</title>
+  <style>
+    :root { color-scheme: light dark; font: 16px system-ui, sans-serif; }
+    body { margin: 0; padding: 16px; }
+    h2 { margin: 0 0 12px; font-size: 1rem; }
+    button { min-height: 44px; padding: 0 16px; font: inherit; cursor: pointer; }
+    button:disabled { cursor: default; }
+    p { margin: 12px 0 0; }
+    p:empty { display: none; }
+  </style>
+</head>
+<body>
+  <h2>Apartment Luna</h2>
+  <button id="open" type="button" disabled>Open door</button>
+  <p id="status" role="status"></p>
+
+  <script>
+    const button = document.querySelector("#open");
+    const status = document.querySelector("#status");
+    const labels = {
+      de: ["Tür öffnen", "Öffnung angefragt …", "Türöffner bestätigt.",
+           "Türöffner nicht erreichbar.", "Öffnung nicht bestätigt. Prüfe die Tür vor Ort.",
+           "Rufe die Tür-Karte erneut auf, um es noch einmal zu versuchen."],
+      en: ["Open door", "Opening requested…", "Door release confirmed.",
+           "Door opener is offline.", "Opening unconfirmed. Check the door in person.",
+           "Open a new door card to try again."],
+      cs: ["Otevřít dveře", "Požadavek odeslán…", "Otevírač dveří potvrdil požadavek.",
+           "Otevírání dveří je nedostupné.", "Otevření nebylo potvrzeno. Zkontrolujte dveře.",
+           "Otevřete novou kartu pro další pokus."]
+    };
+    const requestedLanguage = navigator.language.split("-")[0];
+    const language = Object.hasOwn(labels, requestedLanguage) ? requestedLanguage : "en";
+    document.documentElement.lang = language;
+    const [openLabel, waiting, done, offline, unconfirmed, tryAgain] = labels[language];
+    button.textContent = openLabel;
+
+    let rpcId = 0;
+    let ticket;
+    let ready = false;
+    let submitted = false;
+    const pending = new Map();
+
+    function post(message) {
+      window.parent.postMessage({ jsonrpc: "2.0", ...message }, "*");
+    }
+
+    function rpc(method, params) {
+      return new Promise((resolve, reject) => {
+        const id = ++rpcId;
+        const timer = setTimeout(() => {
+          pending.delete(id);
+          reject(new Error("MCP request timed out"));
+        }, 8000);
+        pending.set(id, { resolve, reject, timer });
+        post({ id, method, params });
+      });
+    }
+
+    function readTicket(meta) {
+      if (typeof meta?.ticket === "string" && !submitted) {
+        ticket = meta.ticket;
+        button.disabled = !ready;
+      }
+    }
+
+    window.addEventListener("message", (event) => {
+      if (event.source !== window.parent || event.data?.jsonrpc !== "2.0") return;
+      const { id, method, params, result, error } = event.data;
+      if (method === "ui/notifications/tool-result") {
+        readTicket(params?._meta);
+        return;
+      }
+      const request = pending.get(id);
+      if (!request) return;
+      pending.delete(id);
+      clearTimeout(request.timer);
+      if (error) request.reject(error);
+      else request.resolve(result);
+    });
+
+    window.addEventListener("openai:set_globals", (event) => {
+      readTicket(event.detail?.globals?.toolResponseMetadata);
+    });
+
+    async function initialize() {
+      try {
+        await rpc("ui/initialize", {
+          appInfo: { name: "flatmanager-guest-door", version: "0.1.0" },
+          appCapabilities: {},
+          protocolVersion: "2026-01-26"
+        });
+        post({ method: "ui/notifications/initialized", params: {} });
+        ready = true;
+        readTicket(window.openai?.toolResponseMetadata);
+        button.disabled = !ticket;
+      } catch {
+        status.textContent = tryAgain;
+      }
+    }
+
+    function call(name, args) {
+      return rpc("tools/call", { name, arguments: args });
+    }
+
+    async function poll(commandId) {
+      for (let attempt = 0; attempt < 12; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const reply = await call("get_luna_door_command_status", { command_id: commandId });
+        const state = reply?.structuredContent?.status;
+        if (state === "done") return done;
+        if (state !== "pending" && state !== "delivered") return unconfirmed;
+      }
+      return unconfirmed;
+    }
+
+    button.addEventListener("click", async (event) => {
+      if (!event.isTrusted || !ready || !ticket || submitted) return;
+      submitted = true;
+      button.disabled = true;
+      status.textContent = waiting;
+      try {
+        const reply = await call("open_luna_guest_door", { ticket });
+        const door = reply?.structuredContent;
+        if (door?.status === "accepted") status.textContent = await poll(door.command_id);
+        else status.textContent = door?.status === "offline" ? offline : tryAgain;
+      } catch {
+        status.textContent = unconfirmed;
+      }
+    });
+
+    initialize();
+  </script>
+</body>
+</html>
