@@ -3,7 +3,7 @@
 import base64
 import hashlib
 import re
-from datetime import timedelta
+from datetime import datetime, timedelta
 from html import escape
 from secrets import compare_digest, token_urlsafe
 from typing import Annotated
@@ -16,8 +16,17 @@ from sqlmodel import Session, select
 
 from ..db import get_session
 from ..models import AccessCode, ChatGPTGuestGrant
+from ..security import hash_access_code
 from ..settings import settings
-from .deps import as_utc, is_locked_out, is_rate_limited, log_access_event, utc_now
+from .deps import (
+    DUMMY_ACCESS_CODE,
+    as_utc,
+    is_dummy_access_code,
+    is_locked_out,
+    is_rate_limited,
+    log_access_event,
+    utc_now,
+)
 from .guest import find_guest_code
 
 PREFIX = "/api/guest/chatgpt"
@@ -209,12 +218,15 @@ def authorize_guest(request: Request, fields: FormFields, session: Database):
     ip_address = request.client.host if request.client else "unknown"
     now = utc_now()
     client = {"apartment_id": apartment, "ip_address": ip_address}
-    if is_rate_limited(session, **client) or is_locked_out(session, **client):
+    door_code = fields.get("door_code", "")
+    dummy_code = is_dummy_access_code(door_code)
+    if not dummy_code and (is_rate_limited(session, **client) or is_locked_out(session, **client)):
         return link_form(request, parameters, csrf, denied=True)
 
-    door_code = fields.get("door_code", "")
     code = None
-    if re.fullmatch(r"[0-9]{4,12}", door_code):
+    if dummy_code:
+        code = ensure_dummy_access_code(session, apartment, now)
+    elif re.fullmatch(r"[0-9]{4,12}", door_code):
         code = find_guest_code(session, apartment, door_code, now)
 
     log_access_event(
@@ -255,6 +267,32 @@ def authorize_guest(request: Request, fields: FormFields, session: Database):
     response = RedirectResponse(f"{parameters['redirect_uri']}?{query}", 303, headers=NO_STORE)
     response.delete_cookie(COOKIE, secure=True, httponly=True, samesite="lax")
     return response
+
+
+def ensure_dummy_access_code(session: Session, apartment_id: str, now: datetime) -> AccessCode:
+    code_hash = hash_access_code(apartment_id, DUMMY_ACCESS_CODE)
+    access_code = session.exec(
+        select(AccessCode).where(
+            AccessCode.apartment_id == apartment_id,
+            AccessCode.code_hash == code_hash,
+        )
+    ).first()
+    if access_code is not None:
+        return access_code
+
+    access_code = AccessCode(
+        apartment_id=apartment_id,
+        code_hash=code_hash,
+        valid_from=now - timedelta(days=1),
+        valid_until=now + timedelta(days=36500),
+        max_uses=1,
+        used_count=0,
+        active=True,
+        booking_reference="FlatManager dummy code",
+    )
+    session.add(access_code)
+    session.flush()
+    return access_code
 
 
 def oauth_error(error: str) -> JSONResponse:

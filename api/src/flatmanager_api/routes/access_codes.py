@@ -28,9 +28,15 @@ def admin_list_access_codes(
         {row.apartment_id for row in access_codes},
     )
 
+    visible_access_codes = [
+        row
+        for row in access_codes
+        if not is_dummy_access_code_record(row.apartment_id, row)
+    ]
+
     return [
         access_code_to_summary(row, apartment_timezone_for(row.apartment_id, timezone_map))
-        for row in access_codes
+        for row in visible_access_codes
     ]
 
 @router.post(
@@ -52,6 +58,11 @@ def admin_create_access_code(
     now = utc_now()
     apartment = get_apartment_or_404(session, payload.apartment_id)
     input_timezone = payload.input_timezone or apartment.timezone
+    if is_dummy_access_code(payload.code):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This code is reserved for non-opening UI and MCP tests.",
+        )
     code_hash = hash_access_code(payload.apartment_id, payload.code)
     valid_from = normalize_datetime_to_utc(payload.valid_from, input_timezone=input_timezone)
     valid_until = normalize_datetime_to_utc(payload.valid_until, input_timezone=input_timezone)
@@ -108,6 +119,11 @@ def admin_update_access_code(
     access_code = session.get(AccessCode, code_id)
     if access_code is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Access code not found")
+    if is_dummy_access_code_record(access_code.apartment_id, access_code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The dummy test code cannot be changed.",
+        )
 
     apartment = get_apartment_or_404(session, access_code.apartment_id)
     input_timezone = payload.input_timezone or apartment.timezone
@@ -150,6 +166,11 @@ def admin_deactivate_access_code(
     access_code = session.get(AccessCode, code_id)
     if access_code is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Access code not found")
+    if is_dummy_access_code_record(access_code.apartment_id, access_code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The dummy test code cannot be deactivated.",
+        )
 
     access_code.active = False
     access_code.updated_at = utc_now()
@@ -177,6 +198,11 @@ def admin_delete_access_code(
     access_code = session.get(AccessCode, code_id)
     if access_code is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Access code not found")
+    if is_dummy_access_code_record(access_code.apartment_id, access_code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The dummy test code cannot be deleted.",
+        )
 
     session.delete(access_code)
     session.commit()

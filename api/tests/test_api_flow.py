@@ -80,6 +80,27 @@ def test_guest_open_success_creates_pending_command_and_logs(tmp_path: Path) -> 
         assert any(row.result == "success" for row in logs)
 
 
+def test_dummy_guest_code_is_simulated_without_queueing_a_command(tmp_path: Path) -> None:
+    _prepare_test_db(tmp_path)
+
+    response = TestClient(app).post(
+        "/api/guest/open",
+        json={"apartment_id": "unknown-apartment", "code": "43214321"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "simulated",
+        "message": "Test code accepted. No door was opened.",
+        "command_id": None,
+    }
+    with Session(get_engine()) as session:
+        assert session.exec(select(DoorCommand)).all() == []
+        log = session.exec(select(AccessLog)).one()
+        assert log.result == "simulated"
+        assert log.command_id is None
+
+
 def test_guest_can_read_own_command_status(tmp_path: Path) -> None:
     _prepare_test_db(tmp_path)
 

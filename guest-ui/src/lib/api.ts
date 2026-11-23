@@ -4,7 +4,7 @@ export type GuestOpenPayload = {
 };
 
 export type GuestOpenResult = {
-  status: "accepted" | "denied";
+  status: "accepted" | "denied" | "simulated";
   message: string;
   command_id?: number | null;
 };
@@ -70,7 +70,7 @@ export async function requestDoorOpen(payload: GuestOpenPayload): Promise<GuestO
   }
 
   const body = (await response.json()) as GuestOpenResult;
-  if (body.status !== "accepted" && body.status !== "denied") {
+  if (body.status !== "accepted" && body.status !== "denied" && body.status !== "simulated") {
     throw new GuestApiError("server", "Unexpected response");
   }
 

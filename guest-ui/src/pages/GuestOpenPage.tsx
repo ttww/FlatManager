@@ -10,6 +10,7 @@ type UiState =
   | "idle"
   | "loading"
   | "accepted"
+  | "simulated"
   | "waiting"
   | "door-opened"
   | "device-failed"
@@ -61,6 +62,7 @@ export function GuestOpenPage() {
   const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
 
   const stateMessage = useMemo(() => {
+    if (uiState === "simulated") return t.simulated ?? messages.en.simulated;
     if (uiState === "accepted") return t.accepted;
     if (uiState === "waiting") return t.waiting;
     if (uiState === "door-opened") return t.doorOpened;
@@ -77,7 +79,7 @@ export function GuestOpenPage() {
       return { tone: "progress", icon: "", spinner: true };
     }
 
-    if (uiState === "door-opened") {
+    if (uiState === "door-opened" || uiState === "simulated") {
       return { tone: "ok", icon: "check", spinner: false };
     }
 
@@ -153,7 +155,10 @@ export function GuestOpenPage() {
         code: code.trim(),
       });
 
-      if (result.status === "accepted") {
+      if (result.status === "simulated") {
+        setUiState("simulated");
+        setCommandId(null);
+      } else if (result.status === "accepted") {
         setUiState("accepted");
         setCommandId(result.command_id ?? null);
       } else {

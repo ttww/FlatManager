@@ -82,7 +82,7 @@ def tool(client, name, args=None, *, token=""):
     return mcp(client, "tools/call", {"name": name, "arguments": args or {}}, token=token)
 
 
-def connect(client):
+def connect(client, door_code=DOOR_CODE):
     resource = client.get(RESOURCE_METADATA_PATH).json()
     issuer = client.get(ISSUER_METADATA_PATH).json()
     assert resource["authorization_servers"] == [issuer["issuer"]]
@@ -101,14 +101,14 @@ def connect(client):
     page = client.get(authorize, params=params)
     assert page.status_code == 200
     csrf = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
-    assert client.post(authorize, data={**params, "door_code": DOOR_CODE}).status_code == 403
+    assert client.post(authorize, data={**params, "door_code": door_code}).status_code == 403
     response = client.post(
         authorize,
-        data={**params, "csrf": csrf, "door_code": DOOR_CODE},
+        data={**params, "csrf": csrf, "door_code": door_code},
         follow_redirects=False,
     )
     assert response.status_code == 303, response.text
-    assert DOOR_CODE not in response.headers["location"]
+    assert door_code not in response.headers["location"]
     redirected = parse_qs(urlsplit(response.headers["location"]).query)
     assert redirected["state"] == [params["state"]]
     assert redirected["iss"] == [issuer["issuer"]]
@@ -242,6 +242,28 @@ def test_link_open_poll_and_revoke(guest_client, monkeypatch):
         code.active = False
         session.commit()
     assert tool(client, "show_luna_door_control", token=token)["isError"]
+
+
+def test_dummy_code_connects_and_simulates_mcp_open(guest_client):
+    client = guest_client
+    token = connect(client, "43214321")
+    ticket = tool(client, "show_luna_door_control", token=token)["_meta"]["ticket"]
+
+    result = tool(client, "open_luna_guest_door", {"ticket": ticket}, token=token)
+
+    assert result["structuredContent"] == {
+        "status": "simulated",
+        "message": "Test code accepted. No door was opened.",
+        "command_id": None,
+    }
+    with Session(get_engine()) as session:
+        assert session.exec(select(DoorCommand)).all() == []
+        dummy = session.exec(
+            select(AccessCode).where(
+                AccessCode.code_hash == hash_access_code("test-apartment", "43214321")
+            )
+        ).one()
+        assert dummy.used_count == 0
 
 
 def test_offline_device_does_not_consume_a_use(guest_client):

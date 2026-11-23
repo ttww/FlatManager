@@ -26,6 +26,18 @@ def guest_open(
     user_agent = request.headers.get("user-agent")
     trusted_ip = ip_address in settings.trusted_ip_set()
 
+    if is_dummy_access_code(payload.code):
+        log_access_event(
+            session,
+            apartment_id=payload.apartment_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            result="simulated",
+            reason="dummy_access_code",
+        )
+        session.commit()
+        return GuestOpenResponse(status="simulated", message=SIMULATED_MESSAGE)
+
     if not trusted_ip and is_rate_limited(
         session, apartment_id=payload.apartment_id, ip_address=ip_address
     ):
@@ -125,6 +137,19 @@ def queue_guest_open(
     source: str = "guest",
 ) -> GuestOpenResponse:
     apartment_id = access_code.apartment_id
+    if is_dummy_access_code_record(apartment_id, access_code):
+        log_access_event(
+            session,
+            apartment_id=apartment_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            access_code_id=access_code.id,
+            result="simulated",
+            reason="dummy_access_code",
+        )
+        session.commit()
+        return GuestOpenResponse(status="simulated", message=SIMULATED_MESSAGE)
+
     now = utc_now()
     device = session.exec(
         select(Device).where(Device.apartment_id == apartment_id).order_by(Device.id.asc())

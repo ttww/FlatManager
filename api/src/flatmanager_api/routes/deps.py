@@ -68,6 +68,8 @@ logger = logging.getLogger(__name__)
 
 NEUTRAL_DENIED_MESSAGE = "Code invalid or not valid."
 SUCCESS_MESSAGE = "Door opening requested."
+SIMULATED_MESSAGE = "Test code accepted. No door was opened."
+DUMMY_ACCESS_CODE = "43214321"
 GUEST_BACKGROUND_ALLOWED_CONTENT_TYPES = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
@@ -78,6 +80,14 @@ GUEST_BACKGROUND_ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+def is_dummy_access_code(code: str) -> bool:
+    return code == DUMMY_ACCESS_CODE
+
+
+def is_dummy_access_code_record(apartment_id: str, access_code: AccessCode) -> bool:
+    return access_code.code_hash == hash_access_code(apartment_id, DUMMY_ACCESS_CODE)
 
 
 def apartment_to_summary(
