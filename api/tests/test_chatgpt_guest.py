@@ -100,6 +100,10 @@ def connect(client, door_code=DOOR_CODE):
     authorize = urlsplit(issuer["authorization_endpoint"]).path
     page = client.get(authorize, params=params)
     assert page.status_code == 200
+    assert (
+        f"form-action 'self' {settings.chatgpt_guest_redirect_uri}"
+        in page.headers["content-security-policy"].split("; ")
+    )
     csrf = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
     assert client.post(authorize, data={**params, "door_code": door_code}).status_code == 403
     response = client.post(

@@ -169,7 +169,9 @@ def link_form(
         headers={
             **NO_STORE,
             "Content-Security-Policy": (
-                "default-src 'none'; form-action 'self'; frame-ancestors 'none'"
+                "default-src 'none'; "
+                f"form-action 'self' {settings.chatgpt_guest_redirect_uri}; "
+                "frame-ancestors 'none'"
             ),
             "X-Content-Type-Options": "nosniff",
         },
