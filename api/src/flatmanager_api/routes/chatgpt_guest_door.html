@@ -25,18 +25,21 @@
     const labels = {
       de: ["Tür öffnen", "Öffnung angefragt …", "Türöffner bestätigt.",
            "Türöffner nicht erreichbar.", "Öffnung nicht bestätigt. Prüfe die Tür vor Ort.",
-           "Rufe die Tür-Karte erneut auf, um es noch einmal zu versuchen."],
+           "Rufe die Tür-Karte erneut auf, um es noch einmal zu versuchen.",
+           "Testcode akzeptiert. Es wurde keine Tür geöffnet."],
       en: ["Open door", "Opening requested…", "Door release confirmed.",
            "Door opener is offline.", "Opening unconfirmed. Check the door in person.",
-           "Open a new door card to try again."],
+           "Open a new door card to try again.",
+           "Test code accepted. No door was opened."],
       cs: ["Otevřít dveře", "Požadavek odeslán…", "Otevírač dveří potvrdil požadavek.",
            "Otevírání dveří je nedostupné.", "Otevření nebylo potvrzeno. Zkontrolujte dveře.",
-           "Otevřete novou kartu pro další pokus."]
+           "Otevřete novou kartu pro další pokus.",
+           "Testovací kód byl přijat. Žádné dveře se neotevřely."]
     };
     const requestedLanguage = navigator.language.split("-")[0];
     const language = Object.hasOwn(labels, requestedLanguage) ? requestedLanguage : "en";
     document.documentElement.lang = language;
-    const [openLabel, waiting, done, offline, unconfirmed, tryAgain] = labels[language];
+    const [openLabel, waiting, done, offline, unconfirmed, tryAgain, simulated] = labels[language];
     button.textContent = openLabel;
 
     let rpcId = 0;
@@ -127,6 +130,7 @@
         const reply = await call("open_luna_guest_door", { ticket });
         const door = reply?.structuredContent;
         if (door?.status === "accepted") status.textContent = await poll(door.command_id);
+        else if (door?.status === "simulated") status.textContent = simulated;
         else status.textContent = door?.status === "offline" ? offline : tryAgain;
       } catch {
         status.textContent = unconfirmed;
